@@ -1,0 +1,14 @@
+const Map<String, String> claimProperties = {
+  'AccountName': 'sha2-256|CBOR://./v1/account_name',
+  'DomainName': 'sha2-256|CBOR://./v1/domain_name',
+  'SignatureLicense': 'notbot://./v1/signature_license',
+  'SitePass': 'julia://./v1/site_pass',
+  'Honestbot0': 'notbot://./v1/honestbot0',
+  'Notbot0': 'notbot://./v1/notbot0',
+  'Notbot1': 'notbot://./v1/notbot1',
+  'Notbot2': 'notbot://./v1/notbot2',
+  'FirstName': 'julia://./v1/pii/first_name',
+  'GivenNames': 'julia://./v1/pii/given_names',
+  'FamilyName': 'julia://./v1/pii/family_name',
+  'AgeOver18': 'julia://./v1/pii/age_over_18',
+};

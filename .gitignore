@@ -1,0 +1,7 @@
+.idea
+.vite
+.env
+config.yaml
+*/target/*
+*pycache*
+.dart_tool

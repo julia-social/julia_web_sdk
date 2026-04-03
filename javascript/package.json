@@ -1,0 +1,22 @@
+{
+  "name": "julia_web_sdk",
+  "version": "1.0.0",
+  "description": "Julia Web SDK for JavaScript",
+  "type": "module",
+  "main": "src/index.js",
+  "exports": {
+    ".": "./src/index.js",
+    "./client": "./src/client/signatureClient.js",
+    "./signature-client": "./src/client/signatureClient.js",
+    "./server": "./src/server/expressAdapter.js",
+    "./models": "./src/models.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "express": "^5.1.0",
+    "express-session": "^1.18.2",
+    "ws": "^8.18.3"
+  }
+}

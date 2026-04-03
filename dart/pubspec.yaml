@@ -1,0 +1,13 @@
+name: julia_web_sdk
+version: 1.0.0
+description: Julia Web SDK for Dart
+publish_to: "none"
+environment:
+  sdk: ">=3.4.0 <4.0.0"
+
+dependencies:
+  http: ^1.2.2
+  shelf: ^1.4.1
+  shelf_router: ^1.1.4
+  shelf_web_socket: ^2.0.0
+  web_socket_channel: ^3.0.1
