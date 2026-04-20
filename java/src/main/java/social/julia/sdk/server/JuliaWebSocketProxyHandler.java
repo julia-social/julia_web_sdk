@@ -2,7 +2,6 @@ package social.julia.sdk.server;
 
 import org.springframework.web.socket.BinaryMessage;
 import org.springframework.web.socket.CloseStatus;
-import org.springframework.web.socket.PingMessage;
 import org.springframework.web.socket.PongMessage;
 import org.springframework.web.socket.TextMessage;
 import org.springframework.web.socket.WebSocketSession;
@@ -55,7 +54,7 @@ public class JuliaWebSocketProxyHandler extends AbstractWebSocketHandler {
     protected void handleBinaryMessage(WebSocketSession session, BinaryMessage message) {
         WebSocket upstream = upstreamSockets.get(session.getId());
         if (upstream != null) {
-            upstream.sendBinary(message.getPayload().asByteBuffer(), true);
+            upstream.sendBinary(message.getPayload(), true);
         }
     }
 
@@ -63,13 +62,8 @@ public class JuliaWebSocketProxyHandler extends AbstractWebSocketHandler {
     protected void handlePongMessage(WebSocketSession session, PongMessage message) {
         WebSocket upstream = upstreamSockets.get(session.getId());
         if (upstream != null) {
-            upstream.sendPong(message.getPayload().asByteBuffer());
+            upstream.sendPong(message.getPayload());
         }
-    }
-
-    @Override
-    protected void handlePingMessage(WebSocketSession session, PingMessage message) throws Exception {
-        session.sendMessage(new PongMessage(message.getPayload()));
     }
 
     @Override

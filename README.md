@@ -6,7 +6,6 @@ Multi-language SDK and server adapters for Julia verification flows.
 
 - One client interface per language: `SignatureClient`
 - Signature route support: `/signature/*`
-- Signature route support: `/signature/*`
 - Server adapters for:
   - JavaScript (Express)
   - Python (FastAPI)
@@ -87,3 +86,4 @@ Claim constants: `./shared/claim_properties.txt`
 
 - The Rust implementation is the reference path used for core service behavior.
 - Example URLs use `https://example.com` as placeholders.
+- Websocket proxy safety: configure `SignatureClient` / adapter upstream base URL to the real upstream signature service, not the same host serving SDK adapter routes. Pointing both to the same `/signature/*` host can create proxy-to-self loops for `/signature/honestbot`.

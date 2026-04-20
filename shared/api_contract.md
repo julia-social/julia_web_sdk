@@ -124,6 +124,7 @@ Response:
 
 ### `WS /signature/honestbot`
 Proxies frames to upstream `WS /signature/honestbot`.
+Important: adapter upstream base URL must target the external signature service, not the same host/route serving this SDK adapter, to avoid proxy-to-self loops.
 
 ### `WS /calculate_site_pass`
 Proxies frames to upstream `WS /calculate_site_pass`.
