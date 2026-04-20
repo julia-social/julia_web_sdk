@@ -11,22 +11,22 @@ pip install -e .
 
 ## What this package provides
 
-- `SignatureClient`: async client for both `/signature/*` and `/auth/*`.
-- `FastAPIAuthAdapter`: FastAPI router for auth routes and websocket proxying.
+- `SignatureClient`: async client for both upstream and SDK `/signature/*` endpoints.
+- `FastAPISignatureAdapter`: FastAPI router for signature routes and websocket proxying.
 - `CLAIM_PROPERTIES`: claim constants.
 
 ## Recommended Integration
 
-- Use `FastAPIAuthAdapter` in your backend service as the default integration path.
+- Use `FastAPISignatureAdapter` in your backend service as the default integration path.
 - Use `SignatureClient` directly for custom/manual endpoint calls or automation scripts.
 
 ## Client Methods
 
-- Auth:
-  - `get_auth_request_id()`
-  - `get_auth_status()`
-  - `generate_auth_presentation(request_id, nonce)`
-  - `verify_auth_presentation(request_id, presentation)`
+- Signature SDK:
+  - `get_signature_request_id()`
+  - `get_signature_status()`
+  - `generate_signature_presentation(request_id, nonce)`
+  - `verify_signature_presentation(request_id, presentation)`
 - Signature:
   - `start_signature(request)`
   - `generate_presentation(request)`
@@ -38,12 +38,12 @@ pip install -e .
 from fastapi import FastAPI
 from starlette.middleware.sessions import SessionMiddleware
 
-from julia_web_sdk import CLAIM_PROPERTIES, FastAPIAuthAdapter, create_signature_client_from_env
+from julia_web_sdk import CLAIM_PROPERTIES, FastAPISignatureAdapter, create_signature_client_from_env
 
 app = FastAPI()
 app.add_middleware(SessionMiddleware, secret_key="replace-me")
 
-adapter = FastAPIAuthAdapter(
+adapter = FastAPISignatureAdapter(
     signature_client=create_signature_client_from_env(),
     requested_claims=[
         CLAIM_PROPERTIES["Notbot0"],
@@ -68,13 +68,13 @@ from julia_web_sdk import SignatureClient
 
 async def main() -> None:
     client = SignatureClient("https://example.com")
-    request_id = await client.get_auth_request_id()
-    status = await client.get_auth_status()
-    presentation = await client.generate_auth_presentation(
+    request_id = await client.get_signature_request_id()
+    status = await client.get_signature_status()
+    presentation = await client.generate_signature_presentation(
         request_id,
         "0x00112233445566778899aabbccddeeff00112233445566778899aabbccddeeff",
     )
-    await client.verify_auth_presentation(request_id, [])
+    await client.verify_signature_presentation(request_id, [])
     print(request_id, status)
     await client.close()
 

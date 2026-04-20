@@ -26,18 +26,18 @@ import java.util.concurrent.CompletionException;
 import java.util.concurrent.ConcurrentHashMap;
 
 @RestController
-public class SpringAuthController {
+public class SpringSignatureController {
     private final SignatureClient signatureClient;
-    private final AuthAdapterConfig config;
-    private final Map<String, String> sessionAuthorizations = new ConcurrentHashMap<>();
+    private final SignatureAdapterConfig config;
+    private final Map<String, String> sessionSignatures = new ConcurrentHashMap<>();
 
-    public SpringAuthController(SignatureClient signatureClient, AuthAdapterConfig config) {
+    public SpringSignatureController(SignatureClient signatureClient, SignatureAdapterConfig config) {
         this.signatureClient = signatureClient;
         this.config = config;
     }
 
-    @GetMapping("/auth/notbot")
-    public ResponseEntity<?> getAuthUrl(HttpServletRequest request) {
+    @GetMapping("/signature/notbot")
+    public ResponseEntity<?> getSignatureUrl(HttpServletRequest request) {
         HttpSession session = request.getSession(false);
         if (session != null) {
             session.removeAttribute(config.getSessionAttributeName());
@@ -59,7 +59,7 @@ public class SpringAuthController {
                     sessionId = created.getId();
                 }
             }
-            sessionAuthorizations.put(response.requestId, sessionId);
+            sessionSignatures.put(response.requestId, sessionId);
             return ResponseEntity.ok(response.requestId);
         } catch (Exception error) {
             handleFailure(error);
@@ -68,14 +68,14 @@ public class SpringAuthController {
         }
     }
 
-    @GetMapping("/auth/status")
-    public ResponseEntity<Boolean> getAuthStatus(HttpServletRequest request) {
+    @GetMapping("/signature/status")
+    public ResponseEntity<Boolean> getSignatureStatus(HttpServletRequest request) {
         HttpSession session = request.getSession(false);
         boolean status = session != null && session.getAttribute(config.getSessionAttributeName()) != null;
         return ResponseEntity.ok(status);
     }
 
-    @PostMapping("/auth/notbot/{requestId}")
+    @PostMapping("/signature/notbot/{requestId}")
     public ResponseEntity<?> getRequestPresentation(
             @PathVariable("requestId") String requestId,
             @RequestBody SignatureRequest payload
@@ -96,7 +96,7 @@ public class SpringAuthController {
         }
     }
 
-    @PostMapping("/auth/verify/{requestId}")
+    @PostMapping("/signature/verify/{requestId}")
     public ResponseEntity<?> verifyPresentation(
             @PathVariable("requestId") String requestId,
             @RequestBody ClientPresentation payload,
@@ -116,7 +116,7 @@ public class SpringAuthController {
         }
 
         try {
-            String sessionId = sessionAuthorizations.remove(requestId);
+            String sessionId = sessionSignatures.remove(requestId);
             HttpSession session = config.getSessionResolver().resolve(sessionId, servletRequest);
             if (session == null) {
                 session = servletRequest.getSession(true);

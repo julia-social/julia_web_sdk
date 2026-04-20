@@ -30,7 +30,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use time::OffsetDateTime;
 use tokio::sync::RwLock;
 
-pub type SessionAuthorizations = HashMap<String, String>; //(request_id, session_id)
+pub type SessionSignatures = HashMap<String, String>; //(request_id, session_id)
 
 pub type SuccessCallback = Box<
     dyn Fn(
@@ -117,9 +117,9 @@ impl From<ServiceBuilder> for ServiceGroup {
                 expire_time: builder.expire_time,
             })
             .shared_state(client)
-            .shared_state(RwLock::new(SessionAuthorizations::new()))
-            .service(get_auth_url)
-            .service(get_auth_status)
+            .shared_state(RwLock::new(SessionSignatures::new()))
+            .service(get_signature_url)
+            .service(get_signature_status)
             .service(get_request_presentation)
             .service(verify_presentation)
             .service(verify_honestbot::default())
@@ -127,12 +127,12 @@ impl From<ServiceBuilder> for ServiceGroup {
     }
 }
 
-#[get("/auth/notbot", output = "json", eoutput = "bytes")]
-async fn get_auth_url(
+#[get("/signature/notbot", output = "json", eoutput = "bytes")]
+async fn get_signature_url(
     signature_client: State<SignatureClient>,
     session: State<RwLock<Session>>,
     config: State<SignatureConfig>,
-    session_authorizations: State<RwLock<SessionAuthorizations>>,
+    session_signatures: State<RwLock<SessionSignatures>>,
 ) -> Result<String, Error> {
     if let Some(current_claims) = session
         .0
@@ -161,7 +161,7 @@ async fn get_auth_url(
         .await?;
     let session_id = session.0.read().await.id.to_string();
     info!("Saving Request {} to session {session_id}", resp.request_id);
-    session_authorizations
+    session_signatures
         .write()
         .await
         .insert(resp.request_id.clone(), session_id);
@@ -169,12 +169,12 @@ async fn get_auth_url(
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
-struct AuthPresentationRequest {
+struct SignaturePresentationRequest {
     pub nonce: Bytes32,
 }
 
-#[get("/auth/status", output = "json", eoutput = "bytes")]
-async fn get_auth_status(session: State<RwLock<Session>>) -> Result<bool, Error> {
+#[get("/signature/status", output = "json", eoutput = "bytes")]
+async fn get_signature_status(session: State<RwLock<Session>>) -> Result<bool, Error> {
     Ok(session
         .0
         .read()
@@ -184,9 +184,9 @@ async fn get_auth_status(session: State<RwLock<Session>>) -> Result<bool, Error>
         .is_some())
 }
 
-#[post("/auth/notbot/{squid}", output = "json", eoutput = "bytes")]
+#[post("/signature/notbot/{squid}", output = "json", eoutput = "bytes")]
 async fn get_request_presentation(
-    payload: Json<Option<AuthPresentationRequest>>,
+    payload: Json<Option<SignaturePresentationRequest>>,
     squid: Path,
     signature_client: State<SignatureClient>,
 ) -> Result<ServerPresentation, Error> {
@@ -201,13 +201,13 @@ async fn get_request_presentation(
         compressed_presentation: response.compressed_presentation,
     })
 }
-#[post("/auth/verify/{request_id}", output = "json", eoutput = "bytes")]
+#[post("/signature/verify/{request_id}", output = "json", eoutput = "bytes")]
 async fn verify_presentation(
     payload: Json<Option<ClientPresentation>>,
     request_id: Path,
     signature_client: State<SignatureClient>,
     session: State<RwLock<Session>>,
-    session_authorizations: State<RwLock<SessionAuthorizations>>,
+    session_signatures: State<RwLock<SessionSignatures>>,
     config: State<SignatureConfig>,
 ) -> Result<(), Error> {
     let payload = payload.inner().ok_or(Error::input("Missing payload"))?;
@@ -226,9 +226,9 @@ async fn verify_presentation(
         }
     };
     info!("Loading Request {request_id}");
-    let authed_session = match session_authorizations.0.write().await.remove(&request_id) {
+    let signed_session = match session_signatures.0.write().await.remove(&request_id) {
         None => {
-            info!("No Session Found to Add Auth");
+            info!("No Session Found to Add Signature");
             session.0.clone()
         }
         Some(session_id) => {
@@ -246,11 +246,11 @@ async fn verify_presentation(
         }
     };
     info!("Running Success Callback");
-    (config.0.on_success)(response, authed_session.clone()).await?;
+    (config.0.on_success)(response, signed_session.clone()).await?;
     Ok(())
 }
 
-#[websocket("/auth/honestbot")]
+#[websocket("/signature/honestbot")]
 async fn verify_honestbot(
     client_socket: WebSocket,
     headers: RequestHeaders,

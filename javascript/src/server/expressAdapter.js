@@ -31,7 +31,7 @@ function loadSessionById(store, sessionId) {
   });
 }
 
-export function createExpressAuthAdapter({
+export function createExpressSignatureAdapter({
   signatureClient = new SignatureClient(),
   requestedClaims = [],
   requireSitePass = false,
@@ -43,9 +43,9 @@ export function createExpressAuthAdapter({
   expireTimeSeconds = 3600
 } = {}) {
   const router = express.Router();
-  const requestToSession = new Map();
+  const requestToSignatureSession = new Map();
 
-  router.get("/auth/notbot", async (req, res) => {
+  router.get("/signature/notbot", async (req, res) => {
     try {
       delete req.session?.juliaSignatureVerification;
       const response = await signatureClient.startSignature({
@@ -56,7 +56,7 @@ export function createExpressAuthAdapter({
         expires: Math.floor(Date.now() / 1000) + expireTimeSeconds
       });
       if (response?.request_id && req.sessionID) {
-        requestToSession.set(response.request_id, req.sessionID);
+        requestToSignatureSession.set(response.request_id, req.sessionID);
       }
       res.json(response?.request_id ?? response);
     } catch (error) {
@@ -65,12 +65,12 @@ export function createExpressAuthAdapter({
     }
   });
 
-  router.get("/auth/status", async (req, res) => {
+  router.get("/signature/status", async (req, res) => {
     const ok = Boolean(req.session?.juliaSignatureVerification);
     res.json(ok);
   });
 
-  router.post("/auth/notbot/:requestId", async (req, res) => {
+  router.post("/signature/notbot/:requestId", async (req, res) => {
     const payload = req.body;
     if (!payload || typeof payload !== "object" || typeof payload.nonce !== "string") {
       res.status(400).json({ error: "Missing payload.nonce" });
@@ -89,7 +89,7 @@ export function createExpressAuthAdapter({
     }
   });
 
-  router.post("/auth/verify/:requestId", async (req, res) => {
+  router.post("/signature/verify/:requestId", async (req, res) => {
     const payload = req.body;
     if (!payload || typeof payload !== "object" || !Array.isArray(payload.presentation)) {
       res.status(400).json({ error: "Missing payload.presentation" });
@@ -109,8 +109,8 @@ export function createExpressAuthAdapter({
     }
 
     try {
-      const sessionId = requestToSession.get(req.params.requestId);
-      requestToSession.delete(req.params.requestId);
+      const sessionId = requestToSignatureSession.get(req.params.requestId);
+      requestToSignatureSession.delete(req.params.requestId);
       const targetSession =
         sessionId === req.sessionID
           ? req.session
@@ -130,14 +130,15 @@ export function createExpressAuthAdapter({
 
     httpServer.on("upgrade", (request, socket, head) => {
       const targetPath = new URL(request.url, "http://localhost").pathname;
-      if (targetPath !== "/auth/honestbot" && targetPath !== "/calculate_site_pass") {
+      if (targetPath !== "/signature/honestbot" && targetPath !== "/calculate_site_pass") {
         return;
       }
 
       wsServer.handleUpgrade(request, socket, head, (clientSocket) => {
-        const upstreamPath = targetPath === "/auth/honestbot" ? "/signature/honestbot" : "/calculate_site_pass";
+        const upstreamPath =
+          targetPath === "/signature/honestbot" ? "/signature/honestbot" : "/calculate_site_pass";
         const upstreamHeaders = {};
-        if (targetPath === "/auth/honestbot" && request.headers["x-presentation-hash"]) {
+        if (targetPath === "/signature/honestbot" && request.headers["x-presentation-hash"]) {
           upstreamHeaders["x-presentation-hash"] = request.headers["x-presentation-hash"];
         }
         if (targetPath === "/calculate_site_pass" && request.headers["x-site-pass"]) {

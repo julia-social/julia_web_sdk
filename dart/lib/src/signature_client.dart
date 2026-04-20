@@ -82,47 +82,58 @@ class SignatureClient {
     return VerifySignatureResponse.fromJson(json);
   }
 
-  Future<String> getAuthRequestId() async {
-    final data = await _request('GET', '/auth/notbot', serviceLabel: 'Auth');
+  Future<String> getSignatureRequestId() async {
+    final data = await _request(
+      'GET',
+      '/signature/notbot',
+      serviceLabel: 'Signature',
+    );
     if (data is String) {
       return data;
     }
     throw JuliaWebSdkException(
-      'Invalid /auth/notbot response type',
+      'Invalid /signature/notbot response type',
       body: data,
     );
   }
 
-  Future<bool> getAuthStatus() async {
-    final data = await _request('GET', '/auth/status', serviceLabel: 'Auth');
+  Future<bool> getSignatureStatus() async {
+    final data = await _request(
+      'GET',
+      '/signature/status',
+      serviceLabel: 'Signature',
+    );
     if (data is bool) {
       return data;
     }
-    throw JuliaWebSdkException('Invalid /auth/status response type', body: data);
+    throw JuliaWebSdkException(
+      'Invalid /signature/status response type',
+      body: data,
+    );
   }
 
-  Future<GeneratePresentationResponse> generateAuthPresentation(
+  Future<GeneratePresentationResponse> generateSignaturePresentation(
     String requestId,
     String nonce,
   ) async {
     final response = await _requestMap(
       'POST',
-      '/auth/notbot/${Uri.encodeComponent(requestId)}',
+      '/signature/notbot/${Uri.encodeComponent(requestId)}',
       body: SignatureRequest(nonce: nonce).toJson(),
-      serviceLabel: 'Auth',
+      serviceLabel: 'Signature',
     );
     return GeneratePresentationResponse.fromJson(response);
   }
 
-  Future<void> verifyAuthPresentation(
+  Future<void> verifySignaturePresentation(
     String requestId,
     List<int> presentation,
   ) async {
     await _request(
       'POST',
-      '/auth/verify/${Uri.encodeComponent(requestId)}',
+      '/signature/verify/${Uri.encodeComponent(requestId)}',
       body: ClientPresentation(presentation: presentation).toJson(),
-      serviceLabel: 'Auth',
+      serviceLabel: 'Signature',
     );
   }
 

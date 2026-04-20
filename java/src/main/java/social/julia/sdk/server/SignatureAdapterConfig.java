@@ -9,7 +9,7 @@ import java.util.List;
 import java.util.Objects;
 import java.util.function.Supplier;
 
-public class AuthAdapterConfig {
+public class SignatureAdapterConfig {
     @FunctionalInterface
     public interface OnSuccess {
         void handle(VerifySignatureResponse response, HttpSession session) throws Exception;
@@ -34,7 +34,7 @@ public class AuthAdapterConfig {
     private final String sessionAttributeName;
     private final SessionResolver sessionResolver;
 
-    private AuthAdapterConfig(Builder builder) {
+    private SignatureAdapterConfig(Builder builder) {
         this.requestedClaims = builder.requestedClaims;
         this.requireSitePass = builder.requireSitePass;
         this.messageGenerator = builder.messageGenerator;
@@ -135,8 +135,8 @@ public class AuthAdapterConfig {
             return this;
         }
 
-        public AuthAdapterConfig build() {
-            return new AuthAdapterConfig(this);
+        public SignatureAdapterConfig build() {
+            return new SignatureAdapterConfig(this);
         }
     }
 }

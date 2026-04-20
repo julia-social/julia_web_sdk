@@ -19,8 +19,8 @@ typedef OnSuccess =
 typedef OnFailure =
     FutureOr<void> Function(Object error, StackTrace stackTrace);
 
-class ShelfAuthAdapter {
-  ShelfAuthAdapter({
+class ShelfSignatureAdapter {
+  ShelfSignatureAdapter({
     SignatureClient? signatureClient,
     this.requestedClaims = const <String>[],
     this.requireSitePass = false,
@@ -32,12 +32,12 @@ class ShelfAuthAdapter {
        _messageGenerator = messageGenerator ?? (() => ''),
        _onSuccess = onSuccess ?? _defaultOnSuccess,
        _onFailure = onFailure ?? _defaultOnFailure {
-    _router.get('/auth/notbot', _handleAuthNotbot);
-    _router.get('/auth/status', _handleAuthStatus);
-    _router.post('/auth/notbot/<requestId>', _handleGeneratePresentation);
-    _router.post('/auth/verify/<requestId>', _handleVerify);
+    _router.get('/signature/notbot', _handleSignatureNotbot);
+    _router.get('/signature/status', _handleSignatureStatus);
+    _router.post('/signature/notbot/<requestId>', _handleGeneratePresentation);
+    _router.post('/signature/verify/<requestId>', _handleVerify);
     _router.get(
-      '/auth/honestbot',
+      '/signature/honestbot',
       _proxyWebsocket('/signature/honestbot', 'x-presentation-hash'),
     );
     _router.get(
@@ -58,14 +58,14 @@ class ShelfAuthAdapter {
   final int expireTimeSeconds;
 
   final Router _router = Router();
-  final Map<String, String> _sessionAuthorizations = <String, String>{};
+  final Map<String, String> _sessionSignatures = <String, String>{};
   final Map<String, Map<String, Object?>> _sessions =
       <String, Map<String, Object?>>{};
   final Random _random = Random.secure();
 
   Handler get handler => _router.call;
 
-  Future<Response> _handleAuthNotbot(Request request) async {
+  Future<Response> _handleSignatureNotbot(Request request) async {
     final sessionContext = _resolveSession(request);
     sessionContext.session.remove(_sessionAttrName);
 
@@ -80,7 +80,7 @@ class ShelfAuthAdapter {
               DateTime.now().millisecondsSinceEpoch ~/ 1000 + expireTimeSeconds,
         ),
       );
-      _sessionAuthorizations[response.requestId] = sessionContext.sessionId;
+      _sessionSignatures[response.requestId] = sessionContext.sessionId;
       return _jsonResponse(sessionContext, response.requestId);
     } catch (error, stackTrace) {
       await _onFailure(error, stackTrace);
@@ -88,7 +88,7 @@ class ShelfAuthAdapter {
     }
   }
 
-  Future<Response> _handleAuthStatus(Request request) async {
+  Future<Response> _handleSignatureStatus(Request request) async {
     final sessionContext = _resolveSession(request);
     final status = sessionContext.session[_sessionAttrName] != null;
     return _jsonResponse(sessionContext, status);
@@ -150,7 +150,7 @@ class ShelfAuthAdapter {
     }
 
     final targetSessionId =
-        _sessionAuthorizations.remove(requestId) ?? sessionContext.sessionId;
+        _sessionSignatures.remove(requestId) ?? sessionContext.sessionId;
     final targetSession = _sessions.putIfAbsent(
       targetSessionId,
       () => <String, Object?>{},

@@ -4,8 +4,8 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import social.julia.sdk.ClaimProperties;
 import social.julia.sdk.client.SignatureClient;
-import social.julia.sdk.server.AuthAdapterConfig;
-import social.julia.sdk.server.SpringAuthController;
+import social.julia.sdk.server.SignatureAdapterConfig;
+import social.julia.sdk.server.SpringSignatureController;
 
 import java.util.List;
 
@@ -17,8 +17,8 @@ public class SpringSdkConfig {
     }
 
     @Bean
-    public AuthAdapterConfig authAdapterConfig() {
-        return AuthAdapterConfig.builder()
+    public SignatureAdapterConfig signatureAdapterConfig() {
+        return SignatureAdapterConfig.builder()
                 .requestedClaims(List.of(
                         ClaimProperties.NOTBOT_0,
                         ClaimProperties.SITE_PASS,
@@ -32,7 +32,7 @@ public class SpringSdkConfig {
     }
 
     @Bean
-    public SpringAuthController springAuthController(SignatureClient client, AuthAdapterConfig config) {
-        return new SpringAuthController(client, config);
+    public SpringSignatureController springSignatureController(SignatureClient client, SignatureAdapterConfig config) {
+        return new SpringSignatureController(client, config);
     }
 }

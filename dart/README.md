@@ -11,22 +11,22 @@ dart pub get
 
 ## What this package provides
 
-- `SignatureClient`: async client for both `/signature/*` and `/auth/*`.
-- `ShelfAuthAdapter`: shelf adapter with auth routes + websocket proxy handlers.
+- `SignatureClient`: async client for both upstream and SDK `/signature/*` endpoints.
+- `ShelfSignatureAdapter`: shelf adapter with signature routes + websocket proxy handlers.
 - `claimProperties`: claim constants.
 
 ## Recommended Integration
 
-- Use `ShelfAuthAdapter` in your backend service as the default integration path.
+- Use `ShelfSignatureAdapter` in your backend service as the default integration path.
 - Use `SignatureClient` directly for custom/manual endpoint calls or automation scripts.
 
 ## Client Methods
 
-- Auth:
-  - `getAuthRequestId()`
-  - `getAuthStatus()`
-  - `generateAuthPresentation(requestId, nonce)`
-  - `verifyAuthPresentation(requestId, presentation)`
+- Signature SDK:
+  - `getSignatureRequestId()`
+  - `getSignatureStatus()`
+  - `generateSignaturePresentation(requestId, nonce)`
+  - `verifySignaturePresentation(requestId, presentation)`
 - Signature:
   - `startSignature(request)`
   - `generatePresentation(request)`
@@ -41,7 +41,7 @@ import 'package:julia_web_sdk/julia_web_sdk.dart';
 import 'package:shelf/shelf_io.dart' as shelf_io;
 
 Future<void> main() async {
-  final adapter = ShelfAuthAdapter(
+  final adapter = ShelfSignatureAdapter(
     signatureClient: SignatureClient.fromEnv(),
     requestedClaims: [
       claimProperties['Notbot0']!,
@@ -62,13 +62,13 @@ Future<void> main() async {
 
 ```dart
 final client = SignatureClient(baseUrl: 'https://example.com');
-final requestId = await client.getAuthRequestId();
-final status = await client.getAuthStatus();
-final presentation = await client.generateAuthPresentation(
+final requestId = await client.getSignatureRequestId();
+final status = await client.getSignatureStatus();
+final presentation = await client.generateSignaturePresentation(
   requestId,
   '0x00112233445566778899aabbccddeeff00112233445566778899aabbccddeeff',
 );
-await client.verifyAuthPresentation(requestId, <int>[]);
+await client.verifySignaturePresentation(requestId, <int>[]);
 ```
 
 ## Examples

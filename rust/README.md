@@ -1,6 +1,6 @@
 # Julia Web SDK (Rust)
 
-Rust crate for Julia verification routes, plus async clients for both `/signature/*` and `/auth/*` endpoints.
+Rust crate for Julia verification routes, plus async clients for both upstream and SDK `/signature/*` endpoints.
 
 ## Crate
 
@@ -9,8 +9,8 @@ Rust crate for Julia verification routes, plus async clients for both `/signatur
 
 ## Main APIs
 
-- `ServiceBuilder`: registers auth routes and websocket proxy routes.
-- `signature_client::SignatureClient`: single client for `/signature/*` and `/auth/*`.
+- `ServiceBuilder`: registers signature routes and websocket proxy routes.
+- `signature_client::SignatureClient`: single client for upstream and SDK `/signature/*`.
 - `models`: shared request/response payload structs used by services and clients.
 
 ## Recommended Integration
@@ -20,11 +20,11 @@ Rust crate for Julia verification routes, plus async clients for both `/signatur
 
 ## Client Methods
 
-- Auth:
-  - `get_auth_request_id() -> Result<String, Error>`
-  - `get_auth_status() -> Result<bool, Error>`
-  - `generate_auth_presentation(request_id, nonce) -> Result<ServerPresentation, Error>`
-  - `verify_auth_presentation(request_id, presentation) -> Result<(), Error>`
+- Signature SDK:
+  - `get_signature_request_id() -> Result<String, Error>`
+  - `get_signature_status() -> Result<bool, Error>`
+  - `generate_signature_presentation(request_id, nonce) -> Result<ServerPresentation, Error>`
+  - `verify_signature_presentation(request_id, presentation) -> Result<(), Error>`
 - Signature:
   - `start_signature(StartSignatureRequest) -> Result<StartSignatureResponse, Error>`
   - `generate_presentation(GeneratePresentationRequest) -> Result<GeneratePresentationResponse, Error>`
@@ -54,13 +54,13 @@ let signature_service = ServiceBuilder::new()
 use julia_web_sdk::signature_client::SignatureClient;
 
 let client = SignatureClient::with_url("https://example.com");
-let request_id = client.get_auth_request_id().await?;
-let status = client.get_auth_status().await?;
+let request_id = client.get_signature_request_id().await?;
+let status = client.get_signature_status().await?;
 
 // Nonce/presentation are placeholders
 let nonce: dg_xch_core::blockchain::sized_bytes::Bytes32 = todo!("32-byte nonce");
-let server_presentation = client.generate_auth_presentation(&request_id, nonce).await?;
-client.verify_auth_presentation(&request_id, vec![]).await?;
+let server_presentation = client.generate_signature_presentation(&request_id, nonce).await?;
+client.verify_signature_presentation(&request_id, vec![]).await?;
 ```
 
 ## Examples

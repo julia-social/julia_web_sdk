@@ -11,23 +11,23 @@ mvn -q package
 
 ## What this package provides
 
-- `social.julia.sdk.client.SignatureClient`: async client for both `/signature/*` and `/auth/*`.
-- `social.julia.sdk.server.SpringAuthController`: Spring MVC auth endpoint adapter.
+- `social.julia.sdk.client.SignatureClient`: async client for both upstream and SDK `/signature/*` endpoints.
+- `social.julia.sdk.server.SpringSignatureController`: Spring MVC signature endpoint adapter.
 - `social.julia.sdk.server.JuliaWebSocketConfig`: Spring websocket proxy registration.
 - `social.julia.sdk.ClaimProperties`: claim constants.
 
 ## Recommended Integration
 
-- Use `SpringAuthController` (with `AuthAdapterConfig`) in your backend as the default integration path.
+- Use `SpringSignatureController` (with `SignatureAdapterConfig`) in your backend as the default integration path.
 - Use `SignatureClient` directly for custom/manual endpoint calls or automation scripts.
 
 ## Client Methods
 
-- Auth:
-  - `getAuthRequestId()`
-  - `getAuthStatus()`
-  - `generateAuthPresentation(requestId, nonce)`
-  - `verifyAuthPresentation(requestId, presentation)`
+- Signature SDK:
+  - `getSignatureRequestId()`
+  - `getSignatureStatus()`
+  - `generateSignaturePresentation(requestId, nonce)`
+  - `verifySignaturePresentation(requestId, presentation)`
 - Signature:
   - `startSignature(StartSignatureRequest)`
   - `generatePresentation(GeneratePresentationRequest)`
@@ -44,8 +44,8 @@ public class SdkConfig {
     }
 
     @Bean
-    public AuthAdapterConfig authAdapterConfig() {
-        return AuthAdapterConfig.builder()
+    public SignatureAdapterConfig signatureAdapterConfig() {
+        return SignatureAdapterConfig.builder()
                 .requestedClaims(List.of(
                         ClaimProperties.NOTBOT_0,
                         ClaimProperties.SITE_PASS,
@@ -58,8 +58,8 @@ public class SdkConfig {
     }
 
     @Bean
-    public SpringAuthController springAuthController(SignatureClient client, AuthAdapterConfig config) {
-        return new SpringAuthController(client, config);
+    public SpringSignatureController springSignatureController(SignatureClient client, SignatureAdapterConfig config) {
+        return new SpringSignatureController(client, config);
     }
 }
 ```
@@ -68,13 +68,13 @@ public class SdkConfig {
 
 ```java
 SignatureClient client = new SignatureClient("https://example.com");
-String requestId = client.getAuthRequestId().join();
-boolean status = client.getAuthStatus().join();
-client.generateAuthPresentation(
+String requestId = client.getSignatureRequestId().join();
+boolean status = client.getSignatureStatus().join();
+client.generateSignaturePresentation(
         requestId,
         "0x00112233445566778899aabbccddeeff00112233445566778899aabbccddeeff"
 ).join();
-client.verifyAuthPresentation(requestId, List.of()).join();
+client.verifySignaturePresentation(requestId, List.of()).join();
 ```
 
 ## Examples

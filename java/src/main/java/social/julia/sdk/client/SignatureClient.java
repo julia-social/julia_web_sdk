@@ -72,34 +72,34 @@ public class SignatureClient {
         return postSignature("/signature/verify", request, VerifySignatureResponse.class);
     }
 
-    public CompletableFuture<String> getAuthRequestId() {
-        HttpRequest request = HttpRequest.newBuilder(URI.create(baseUrl + "/auth/notbot"))
+    public CompletableFuture<String> getSignatureRequestId() {
+        HttpRequest request = HttpRequest.newBuilder(URI.create(baseUrl + "/signature/notbot"))
                 .GET()
                 .build();
 
         return httpClient.sendAsync(request, HttpResponse.BodyHandlers.ofString())
-                .thenApply(response -> parseAuthResponse(response, String.class));
+                .thenApply(response -> parseSdkSignatureResponse(response, String.class));
     }
 
-    public CompletableFuture<Boolean> getAuthStatus() {
-        HttpRequest request = HttpRequest.newBuilder(URI.create(baseUrl + "/auth/status"))
+    public CompletableFuture<Boolean> getSignatureStatus() {
+        HttpRequest request = HttpRequest.newBuilder(URI.create(baseUrl + "/signature/status"))
                 .GET()
                 .build();
 
         return httpClient.sendAsync(request, HttpResponse.BodyHandlers.ofString())
-                .thenApply(response -> parseAuthResponse(response, Boolean.class));
+                .thenApply(response -> parseSdkSignatureResponse(response, Boolean.class));
     }
 
-    public CompletableFuture<GeneratePresentationResponse> generateAuthPresentation(String requestId, String nonce) {
+    public CompletableFuture<GeneratePresentationResponse> generateSignaturePresentation(String requestId, String nonce) {
         SignatureRequest payload = new SignatureRequest();
         payload.nonce = nonce;
-        return postAuth("/auth/notbot/" + requestId, payload, GeneratePresentationResponse.class);
+        return postSdkSignature("/signature/notbot/" + requestId, payload, GeneratePresentationResponse.class);
     }
 
-    public CompletableFuture<Void> verifyAuthPresentation(String requestId, List<Integer> presentation) {
+    public CompletableFuture<Void> verifySignaturePresentation(String requestId, List<Integer> presentation) {
         ClientPresentation payload = new ClientPresentation();
         payload.presentation = presentation;
-        return postAuth("/auth/verify/" + requestId, payload, Void.class)
+        return postSdkSignature("/signature/verify/" + requestId, payload, Void.class)
                 .thenApply(_unused -> null);
     }
 
@@ -122,7 +122,7 @@ public class SignatureClient {
                 .thenApply(response -> parseSignatureResponse(response, responseType));
     }
 
-    private <T> CompletableFuture<T> postAuth(String path, Object payload, Class<T> responseType) {
+    private <T> CompletableFuture<T> postSdkSignature(String path, Object payload, Class<T> responseType) {
         final String body;
         try {
             body = objectMapper.writeValueAsString(payload);
@@ -137,7 +137,7 @@ public class SignatureClient {
                 .build();
 
         return httpClient.sendAsync(request, HttpResponse.BodyHandlers.ofString())
-                .thenApply(response -> parseAuthResponse(response, responseType));
+                .thenApply(response -> parseSdkSignatureResponse(response, responseType));
     }
 
     private <T> T parseSignatureResponse(HttpResponse<String> response, Class<T> responseType) {
@@ -161,11 +161,11 @@ public class SignatureClient {
         }
     }
 
-    private <T> T parseAuthResponse(HttpResponse<String> response, Class<T> responseType) {
+    private <T> T parseSdkSignatureResponse(HttpResponse<String> response, Class<T> responseType) {
         String responseBody = response.body() == null ? "" : response.body();
         if (response.statusCode() < 200 || response.statusCode() >= 300) {
             throw new CompletionException(new JuliaWebSdkException(
-                    "Auth service error " + response.statusCode() + ": " + responseBody,
+                    "Signature service error " + response.statusCode() + ": " + responseBody,
                     response.statusCode(),
                     responseBody
             ));
@@ -174,12 +174,12 @@ public class SignatureClient {
             return null;
         }
         if (responseBody.isEmpty()) {
-            throw new CompletionException(new JuliaWebSdkException("Empty auth response body"));
+            throw new CompletionException(new JuliaWebSdkException("Empty signature response body"));
         }
         try {
             return objectMapper.readValue(responseBody, responseType);
         } catch (Exception e) {
-            throw new CompletionException(new JuliaWebSdkException("Failed to parse auth response", e));
+            throw new CompletionException(new JuliaWebSdkException("Failed to parse signature response", e));
         }
     }
 

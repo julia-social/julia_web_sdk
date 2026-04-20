@@ -19,7 +19,7 @@ pub struct SignatureClient {
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
-struct AuthNonceRequest {
+struct SignatureNonceRequest {
     pub nonce: Bytes32,
 }
 
@@ -99,55 +99,55 @@ impl SignatureClient {
         Ok(resp)
     }
 
-    pub async fn get_auth_request_id(&self) -> Result<String, Error> {
+    pub async fn get_signature_request_id(&self) -> Result<String, Error> {
         let response = self
             .client
-            .get(format!("{}/auth/notbot", &self.url))
+            .get(format!("{}/signature/notbot", &self.url))
             .header("accept", "application/json")
             .send()
             .await
-            .map_err(|e| Error::connection(format!("Error Connecting to Auth Server: {e:?}")))?;
-        parse_response(response, "auth").await
+            .map_err(|e| Error::connection(format!("Error Connecting to Signature Server: {e:?}")))?;
+        parse_response(response, "signature").await
     }
 
-    pub async fn get_auth_status(&self) -> Result<bool, Error> {
+    pub async fn get_signature_status(&self) -> Result<bool, Error> {
         let response = self
             .client
-            .get(format!("{}/auth/status", &self.url))
+            .get(format!("{}/signature/status", &self.url))
             .header("accept", "application/json")
             .send()
             .await
-            .map_err(|e| Error::connection(format!("Error Connecting to Auth Server: {e:?}")))?;
-        parse_response(response, "auth").await
+            .map_err(|e| Error::connection(format!("Error Connecting to Signature Server: {e:?}")))?;
+        parse_response(response, "signature").await
     }
 
-    pub async fn generate_auth_presentation(
+    pub async fn generate_signature_presentation(
         &self,
         request_id: &str,
         nonce: Bytes32,
     ) -> Result<ServerPresentation, Error> {
         let response = self
             .client
-            .post(format!("{}/auth/notbot/{}", &self.url, request_id))
-            .json(&AuthNonceRequest { nonce })
+            .post(format!("{}/signature/notbot/{}", &self.url, request_id))
+            .json(&SignatureNonceRequest { nonce })
             .send()
             .await
-            .map_err(|e| Error::connection(format!("Error Connecting to Auth Server: {e:?}")))?;
-        parse_response(response, "auth").await
+            .map_err(|e| Error::connection(format!("Error Connecting to Signature Server: {e:?}")))?;
+        parse_response(response, "signature").await
     }
 
-    pub async fn verify_auth_presentation(
+    pub async fn verify_signature_presentation(
         &self,
         request_id: &str,
         presentation: Vec<u8>,
     ) -> Result<(), Error> {
         let response = self
             .client
-            .post(format!("{}/auth/verify/{}", &self.url, request_id))
+            .post(format!("{}/signature/verify/{}", &self.url, request_id))
             .json(&ClientPresentation { presentation })
             .send()
             .await
-            .map_err(|e| Error::connection(format!("Error Connecting to Auth Server: {e:?}")))?;
+            .map_err(|e| Error::connection(format!("Error Connecting to Signature Server: {e:?}")))?;
         let status = response.status();
         if status.is_success() {
             Ok(())
@@ -155,13 +155,13 @@ impl SignatureClient {
             let body = response.bytes().await.map_err(|e| {
                 Error::new(
                     ErrorCode::BodyRead,
-                    format!("Error Reading Auth Body: {e:?}"),
+                    format!("Error Reading Signature Body: {e:?}"),
                 )
             })?;
             Err(Error::new(
                 ErrorCode::ServerError,
                 format!(
-                    "Got Auth Server Error: {} - {}",
+                    "Got Signature Server Error: {} - {}",
                     status.as_u16(),
                     String::from_utf8_lossy(&body)
                 ),

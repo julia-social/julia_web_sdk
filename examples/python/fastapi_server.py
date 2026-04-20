@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from starlette.middleware.sessions import SessionMiddleware
 
-from julia_web_sdk import CLAIM_PROPERTIES, FastAPIAuthAdapter, create_signature_client_from_env
+from julia_web_sdk import CLAIM_PROPERTIES, FastAPISignatureAdapter, create_signature_client_from_env
 
 app = FastAPI()
 app.add_middleware(
@@ -10,7 +10,7 @@ app.add_middleware(
     https_only=False,
 )
 
-adapter = FastAPIAuthAdapter(
+adapter = FastAPISignatureAdapter(
     signature_client=create_signature_client_from_env(),
     requested_claims=[
         CLAIM_PROPERTIES["Notbot0"],

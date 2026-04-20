@@ -4,7 +4,7 @@ import 'package:julia_web_sdk/julia_web_sdk.dart';
 import 'package:shelf/shelf_io.dart' as shelf_io;
 
 Future<void> main() async {
-  final adapter = ShelfAuthAdapter(
+  final adapter = ShelfSignatureAdapter(
     signatureClient: SignatureClient.fromEnv(),
     requestedClaims: [
       claimProperties['Notbot0']!,

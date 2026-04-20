@@ -47,33 +47,33 @@ export class SignatureClient {
     return this.#requestSignature("/signature/verify", request);
   }
 
-  async getAuthRequestId() {
-    const payload = await this.#requestAuth("/auth/notbot", { method: "GET" });
+  async getSignatureRequestId() {
+    const payload = await this.#requestSdkSignature("/signature/notbot", { method: "GET" });
     if (typeof payload === "string") {
       return payload;
     }
-    throw new JuliaWebSdkError("Missing request id in /auth/notbot response", null, payload);
+    throw new JuliaWebSdkError("Missing request id in /signature/notbot response", null, payload);
   }
 
-  async getAuthStatus() {
-    const payload = await this.#requestAuth("/auth/status", { method: "GET" });
+  async getSignatureStatus() {
+    const payload = await this.#requestSdkSignature("/signature/status", { method: "GET" });
     if (typeof payload === "boolean") {
       return payload;
     }
-    throw new JuliaWebSdkError("Invalid /auth/status response type", null, payload);
+    throw new JuliaWebSdkError("Invalid /signature/status response type", null, payload);
   }
 
-  async generateAuthPresentation(requestId, nonce) {
+  async generateSignaturePresentation(requestId, nonce) {
     bytes32(nonce);
-    return this.#requestAuth(`/auth/notbot/${encodeURIComponent(requestId)}`, {
+    return this.#requestSdkSignature(`/signature/notbot/${encodeURIComponent(requestId)}`, {
       method: "POST",
       body: { nonce }
     });
   }
 
-  async verifyAuthPresentation(requestId, presentation) {
+  async verifySignaturePresentation(requestId, presentation) {
     byteArray(presentation);
-    await this.#requestAuth(`/auth/verify/${encodeURIComponent(requestId)}`, {
+    await this.#requestSdkSignature(`/signature/verify/${encodeURIComponent(requestId)}`, {
       method: "POST",
       body: { presentation }
     });
@@ -92,12 +92,12 @@ export class SignatureClient {
     });
   }
 
-  async #requestAuth(path, { method, body = undefined }) {
+  async #requestSdkSignature(path, { method, body = undefined }) {
     return this.#request(path, {
       method,
       body,
       headers: {},
-      serviceName: "Auth",
+      serviceName: "Signature",
       includeCredentials: true
     });
   }

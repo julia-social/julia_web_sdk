@@ -3,7 +3,7 @@ import session from "express-session";
 import http from "node:http";
 import {
   ClaimProperties,
-  createExpressAuthAdapter,
+  createExpressSignatureAdapter,
   createSignatureClient
 } from "../../javascript/src/index.js";
 
@@ -18,7 +18,7 @@ app.use(
 );
 
 const signatureClient = createSignatureClient();
-const authAdapter = createExpressAuthAdapter({
+const signatureAdapter = createExpressSignatureAdapter({
   signatureClient,
   requestedClaims: [
     ClaimProperties.Notbot0,
@@ -36,11 +36,11 @@ const authAdapter = createExpressAuthAdapter({
   }
 });
 
-app.use(authAdapter.router);
+app.use(signatureAdapter.router);
 app.get("/health", (_req, res) => res.json({ ok: true }));
 
 const server = http.createServer(app);
-authAdapter.attachWebsocketHandlers(server);
+signatureAdapter.attachWebsocketHandlers(server);
 
 const port = Number(process.env.PORT ?? 3000);
 server.listen(port, () => {

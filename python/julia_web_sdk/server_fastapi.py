@@ -42,7 +42,7 @@ async def _maybe_await(result: Awaitable[Any] | Any) -> Any:
     return result
 
 
-class FastAPIAuthAdapter:
+class FastAPISignatureAdapter:
     def __init__(
         self,
         signature_client: SignatureClient | None = None,
@@ -66,7 +66,7 @@ class FastAPIAuthAdapter:
         self.session_key = session_key
         self.session_cookie_name = session_cookie_name
         self.resolve_session = resolve_session
-        self.session_authorizations: dict[str, str | None] = {}
+        self.session_signatures: dict[str, str | None] = {}
 
         self.router = APIRouter()
         self._register_routes()
@@ -80,8 +80,8 @@ class FastAPIAuthAdapter:
         return
 
     def _register_routes(self) -> None:
-        @self.router.get("/auth/notbot")
-        async def get_auth_url(request: Request) -> str:
+        @self.router.get("/signature/notbot")
+        async def get_signature_url(request: Request) -> str:
             session_data = _safe_request_session(request)
             session_data.pop(self.session_key, None)
 
@@ -99,17 +99,17 @@ class FastAPIAuthAdapter:
                 await _maybe_await(self.on_failure(exc))
                 raise HTTPException(status_code=502, detail=str(exc)) from exc
 
-            self.session_authorizations[response.request_id] = request.cookies.get(
+            self.session_signatures[response.request_id] = request.cookies.get(
                 self.session_cookie_name
             )
             return response.request_id
 
-        @self.router.get("/auth/status")
-        async def get_auth_status(request: Request) -> bool:
+        @self.router.get("/signature/status")
+        async def get_signature_status(request: Request) -> bool:
             session_data = _safe_request_session(request)
             return self.session_key in session_data
 
-        @self.router.post("/auth/notbot/{request_id}")
+        @self.router.post("/signature/notbot/{request_id}")
         async def get_request_presentation(
             request_id: str, payload: SignatureRequest
         ) -> ServerPresentation:
@@ -124,7 +124,7 @@ class FastAPIAuthAdapter:
                 compressed_presentation=response.compressed_presentation
             )
 
-        @self.router.post("/auth/verify/{request_id}", status_code=204)
+        @self.router.post("/signature/verify/{request_id}", status_code=204)
         async def verify_presentation(
             request: Request, request_id: str, payload: ClientPresentation
         ) -> Response:
@@ -140,11 +140,11 @@ class FastAPIAuthAdapter:
                 raise HTTPException(status_code=422, detail=str(exc)) from exc
 
             session_data = _safe_request_session(request)
-            auth_session_id = self.session_authorizations.pop(request_id, None)
+            signature_session_id = self.session_signatures.pop(request_id, None)
             target_session = session_data
 
             if self.resolve_session is not None:
-                resolved = await _maybe_await(self.resolve_session(auth_session_id, request))
+                resolved = await _maybe_await(self.resolve_session(signature_session_id, request))
                 if resolved is not None:
                     target_session = resolved
 
@@ -156,7 +156,7 @@ class FastAPIAuthAdapter:
 
             return Response(status_code=204)
 
-        @self.router.websocket("/auth/honestbot")
+        @self.router.websocket("/signature/honestbot")
         async def verify_honestbot(client_socket: WebSocket) -> None:
             await self._proxy_websocket(
                 client_socket,
@@ -234,11 +234,11 @@ class FastAPIAuthAdapter:
 
 
 def create_fastapi_router(**kwargs: Any) -> APIRouter:
-    adapter = FastAPIAuthAdapter(**kwargs)
+    adapter = FastAPISignatureAdapter(**kwargs)
     return adapter.router
 
 
 __all__ = [
-    "FastAPIAuthAdapter",
+    "FastAPISignatureAdapter",
     "create_fastapi_router",
 ]

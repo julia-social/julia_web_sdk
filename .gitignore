@@ -5,3 +5,18 @@ config.yaml
 */target/*
 *pycache*
 .dart_tool
+
+# JavaScript
+javascript/node_modules/
+javascript/package-lock.json
+
+# Python
+python/*.egg-info/
+python/.venv/
+python/.pytest_cache/
+
+# Dart
+dart/.dart_tool/
+
+# Local editor/build caches
+.DS_Store

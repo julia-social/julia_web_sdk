@@ -11,22 +11,22 @@ npm install
 
 ## What this package provides
 
-- `SignatureClient`: calls both upstream signature endpoints (`/signature/*`) and SDK auth endpoints (`/auth/*`) from browser or server code.
-- `createExpressAuthAdapter`: Express route adapter + websocket proxy.
+- `SignatureClient`: calls both upstream signature endpoints and SDK signature endpoints from browser or server code.
+- `createExpressSignatureAdapter`: Express route adapter + websocket proxy.
 - `ClaimProperties`: shared claim constants.
 
 ## Recommended Integration
 
-- Use `createExpressAuthAdapter` in your site backend as the default integration path.
+- Use `createExpressSignatureAdapter` in your site backend as the default integration path.
 - Use `SignatureClient` directly for custom/manual endpoint calls or automation scripts.
 
 ## Client Methods
 
-- Auth:
-  - `getAuthRequestId()`
-  - `getAuthStatus()`
-  - `generateAuthPresentation(requestId, nonce)`
-  - `verifyAuthPresentation(requestId, presentation)`
+- Signature SDK:
+  - `getSignatureRequestId()`
+  - `getSignatureStatus()`
+  - `generateSignaturePresentation(requestId, nonce)`
+  - `verifySignaturePresentation(requestId, presentation)`
 - Signature:
   - `startSignature(request)`
   - `generatePresentation(request)`
@@ -40,7 +40,7 @@ import session from "express-session";
 import http from "node:http";
 import {
   ClaimProperties,
-  createExpressAuthAdapter,
+  createExpressSignatureAdapter,
   createSignatureClient
 } from "julia_web_sdk";
 
@@ -54,7 +54,7 @@ app.use(
   })
 );
 
-const adapter = createExpressAuthAdapter({
+const adapter = createExpressSignatureAdapter({
   signatureClient: createSignatureClient(),
   requestedClaims: [
     ClaimProperties.Notbot0,
@@ -82,13 +82,13 @@ server.listen(3000);
 import { SignatureClient } from "julia_web_sdk";
 
 const client = new SignatureClient({ baseUrl: "https://example.com" });
-const requestId = await client.getAuthRequestId();
-const authenticated = await client.getAuthStatus();
-const presentation = await client.generateAuthPresentation(
+const requestId = await client.getSignatureRequestId();
+const signatureStatus = await client.getSignatureStatus();
+const presentation = await client.generateSignaturePresentation(
   requestId,
   "0x00112233445566778899aabbccddeeff00112233445566778899aabbccddeeff"
 );
-await client.verifyAuthPresentation(requestId, []);
+await client.verifySignaturePresentation(requestId, []);
 ```
 
 ## Examples

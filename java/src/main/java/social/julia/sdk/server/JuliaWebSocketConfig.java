@@ -28,7 +28,7 @@ public class JuliaWebSocketConfig implements WebSocketConfigurer {
                                 URI.create(base + "/signature/honestbot"),
                                 "x-presentation-hash"
                         ),
-                        "/auth/honestbot"
+                        "/signature/honestbot"
                 )
                 .setAllowedOriginPatterns("*");
 

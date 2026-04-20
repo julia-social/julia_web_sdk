@@ -84,31 +84,31 @@ class SignatureClient:
         payload = await self._request_signature("/signature/verify", request.model_dump())
         return VerifySignatureResponse.model_validate(payload)
 
-    async def get_auth_request_id(self) -> str:
-        payload = await self._request_auth("GET", "/auth/notbot")
+    async def get_signature_request_id(self) -> str:
+        payload = await self._request_sdk_signature("GET", "/signature/notbot")
         if isinstance(payload, str):
             return payload
-        raise JuliaWebSdkError("Invalid /auth/notbot response type", body=payload)
+        raise JuliaWebSdkError("Invalid /signature/notbot response type", body=payload)
 
-    async def get_auth_status(self) -> bool:
-        payload = await self._request_auth("GET", "/auth/status")
+    async def get_signature_status(self) -> bool:
+        payload = await self._request_sdk_signature("GET", "/signature/status")
         if isinstance(payload, bool):
             return payload
-        raise JuliaWebSdkError("Invalid /auth/status response type", body=payload)
+        raise JuliaWebSdkError("Invalid /signature/status response type", body=payload)
 
-    async def generate_auth_presentation(
+    async def generate_signature_presentation(
         self, request_id: str, nonce: str
     ) -> GeneratePresentationResponse:
-        payload = await self._request_auth(
+        payload = await self._request_sdk_signature(
             "POST",
-            f"/auth/notbot/{request_id}",
+            f"/signature/notbot/{request_id}",
             json=SignatureRequest(nonce=nonce).model_dump(),
         )
         return GeneratePresentationResponse.model_validate(payload)
 
-    async def verify_auth_presentation(self, request_id: str, presentation: list[int]) -> None:
+    async def verify_signature_presentation(self, request_id: str, presentation: list[int]) -> None:
         payload = {"presentation": presentation}
-        await self._request_auth("POST", f"/auth/verify/{request_id}", json=payload)
+        await self._request_sdk_signature("POST", f"/signature/verify/{request_id}", json=payload)
 
     async def _request_signature(self, path: str, payload: dict[str, Any]) -> dict[str, Any]:
         url = f"{self.base_url}{path}"
@@ -148,7 +148,7 @@ class SignatureClient:
 
         return data
 
-    async def _request_auth(
+    async def _request_sdk_signature(
         self, method: str, path: str, json: dict[str, Any] | None = None
     ) -> Any:
         try:
@@ -158,7 +158,7 @@ class SignatureClient:
                 json=json,
             )
         except Exception as exc:  # noqa: BLE001
-            raise JuliaWebSdkError(f"Error connecting to auth service: {exc}") from exc
+            raise JuliaWebSdkError(f"Error connecting to signature service: {exc}") from exc
 
         raw = response.text
         data: Any
@@ -166,14 +166,14 @@ class SignatureClient:
             data = response.json() if raw else None
         except Exception as exc:  # noqa: BLE001
             raise JuliaWebSdkError(
-                f"Error parsing auth response JSON: {exc} - {raw}",
+                f"Error parsing signature response JSON: {exc} - {raw}",
                 status_code=response.status_code,
                 body=raw,
             ) from exc
 
         if response.is_error:
             raise JuliaWebSdkError(
-                f"Auth service error {response.status_code}: {raw}",
+                f"Signature service error {response.status_code}: {raw}",
                 status_code=response.status_code,
                 body=data,
             )

@@ -5,11 +5,11 @@ from .client import (
     SignatureClientConfig,
     create_signature_client_from_env,
 )
-from .server_fastapi import FastAPIAuthAdapter, create_fastapi_router
+from .server_fastapi import FastAPISignatureAdapter, create_fastapi_router
 
 __all__ = [
     "CLAIM_PROPERTIES",
-    "FastAPIAuthAdapter",
+    "FastAPISignatureAdapter",
     "JuliaWebSdkError",
     "SignatureClient",
     "SignatureClientConfig",

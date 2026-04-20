@@ -78,11 +78,11 @@ Response:
 - Header passthrough: `x-site-pass`.
 - Binary/text frames are proxied in both directions.
 
-## SDK Auth Endpoints
+## SDK Signature Endpoints
 
 These are exposed by each language server adapter.
 
-### `GET /auth/notbot`
+### `GET /signature/notbot`
 Starts a signature request and returns a request id.
 
 Response:
@@ -90,7 +90,7 @@ Response:
 "req_123"
 ```
 
-### `GET /auth/status`
+### `GET /signature/status`
 Returns `true` when the current session already has verification data.
 
 Response:
@@ -98,7 +98,7 @@ Response:
 true
 ```
 
-### `POST /auth/notbot/{requestId}`
+### `POST /signature/notbot/{requestId}`
 Request:
 ```json
 {
@@ -112,7 +112,7 @@ Response:
 }
 ```
 
-### `POST /auth/verify/{requestId}`
+### `POST /signature/verify/{requestId}`
 Request:
 ```json
 {
@@ -122,7 +122,7 @@ Request:
 Response:
 - `204` on success.
 
-### `WS /auth/honestbot`
+### `WS /signature/honestbot`
 Proxies frames to upstream `WS /signature/honestbot`.
 
 ### `WS /calculate_site_pass`
