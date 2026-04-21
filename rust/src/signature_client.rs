@@ -106,7 +106,9 @@ impl SignatureClient {
             .header("accept", "application/json")
             .send()
             .await
-            .map_err(|e| Error::connection(format!("Error Connecting to Signature Server: {e:?}")))?;
+            .map_err(|e| {
+                Error::connection(format!("Error Connecting to Signature Server: {e:?}"))
+            })?;
         parse_response(response, "signature").await
     }
 
@@ -117,7 +119,9 @@ impl SignatureClient {
             .header("accept", "application/json")
             .send()
             .await
-            .map_err(|e| Error::connection(format!("Error Connecting to Signature Server: {e:?}")))?;
+            .map_err(|e| {
+                Error::connection(format!("Error Connecting to Signature Server: {e:?}"))
+            })?;
         parse_response(response, "signature").await
     }
 
@@ -132,7 +136,9 @@ impl SignatureClient {
             .json(&SignatureNonceRequest { nonce })
             .send()
             .await
-            .map_err(|e| Error::connection(format!("Error Connecting to Signature Server: {e:?}")))?;
+            .map_err(|e| {
+                Error::connection(format!("Error Connecting to Signature Server: {e:?}"))
+            })?;
         parse_response(response, "signature").await
     }
 
@@ -147,7 +153,9 @@ impl SignatureClient {
             .json(&ClientPresentation { presentation })
             .send()
             .await
-            .map_err(|e| Error::connection(format!("Error Connecting to Signature Server: {e:?}")))?;
+            .map_err(|e| {
+                Error::connection(format!("Error Connecting to Signature Server: {e:?}"))
+            })?;
         let status = response.status();
         if status.is_success() {
             Ok(())
