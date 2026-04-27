@@ -54,7 +54,7 @@ export class SignatureClient {
     this.baseUrl = trimTrailingSlash(resolvedBaseUrl);
     this.apiKey = apiKey;
     this.timeoutMs = timeoutMs;
-    this.fetchImpl = fetchImpl;
+    this.fetchImpl = typeof fetchImpl.bind === "function" ? fetchImpl.bind(globalThis) : fetchImpl;
   }
 
   async startSignature(request) {
