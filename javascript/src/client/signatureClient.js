@@ -1,7 +1,31 @@
+import * as QRCode from "qrcode";
 import { byteArray, bytes32 } from "../models.js";
 
 function trimTrailingSlash(input) {
   return input.endsWith("/") ? input.slice(0, -1) : input;
+}
+
+function parseRequestId(payload) {
+  if (typeof payload === "string") {
+    return payload;
+  }
+  if (payload && typeof payload === "object") {
+    if (typeof payload.request_id === "string") {
+      return payload.request_id;
+    }
+    if (typeof payload.requestId === "string") {
+      return payload.requestId;
+    }
+  }
+  return null;
+}
+
+function resolveQrEncoder() {
+  const toDataURL = QRCode?.toDataURL ?? QRCode?.default?.toDataURL;
+  if (typeof toDataURL !== "function") {
+    throw new Error("qrcode.toDataURL is not available");
+  }
+  return toDataURL;
 }
 
 export class JuliaWebSdkError extends Error {
@@ -49,10 +73,18 @@ export class SignatureClient {
 
   async getSignatureRequestId() {
     const payload = await this.#requestSdkSignature("/signature/notbot", { method: "GET" });
-    if (typeof payload === "string") {
-      return payload;
+    const requestId = parseRequestId(payload);
+    if (typeof requestId !== "string") {
+      throw new JuliaWebSdkError("Missing request id in /signature/notbot response", null, payload);
     }
-    throw new JuliaWebSdkError("Missing request id in /signature/notbot response", null, payload);
+    const url = this.#buildNotbotUrl(requestId);
+    const toDataURL = resolveQrEncoder();
+    const qr_code = await toDataURL(url, {
+      errorCorrectionLevel: "M",
+      margin: 2,
+      scale: 8
+    });
+    return { request_id: requestId, qr_code, url };
   }
 
   async getSignatureStatus() {
@@ -77,6 +109,24 @@ export class SignatureClient {
       method: "POST",
       body: { presentation }
     });
+  }
+
+  #buildNotbotUrl(requestId) {
+    const parsed = this.#parseBaseUrl();
+    const defaultPort = parsed.protocol === "https:" ? 443 : 80;
+    const port = parsed.port ? Number(parsed.port) : defaultPort;
+    return `notbot://s1/${requestId}/${parsed.hostname}/${port}`;
+  }
+
+  #parseBaseUrl() {
+    try {
+      return new URL(this.baseUrl);
+    } catch (_error) {
+      if (typeof window !== "undefined" && window.location?.origin) {
+        return new URL(this.baseUrl, window.location.origin);
+      }
+      return new URL("http://localhost:80");
+    }
   }
 
   async #requestSignature(path, payload) {
