@@ -365,103 +365,106 @@ async fn proxy_websockets(
     other_socket: Arc<WebSocket>,
     shutdown_signal: Arc<AtomicBool>,
 ) -> Result<(), Error> {
-    let mut err = None;
     loop {
-        match socket.next_message().await {
-            Ok(Some(msg)) => match msg {
-                Message::Binary(bin_msg) => {
-                    if let Err(e) = other_socket.send(Message::Binary(bin_msg)).await {
-                        err = Some(Error::other(format!("{e:?}")));
+        tokio::select! {
+            source_msg = socket.next_message() => {
+                match source_msg {
+                    Ok(Some(Message::Binary(bin_msg))) => {
+                        other_socket
+                            .send(Message::Binary(bin_msg))
+                            .await
+                            .map_err(Error::connection)?;
+                    }
+                    Ok(Some(Message::Text(text_msg))) => {
+                        other_socket
+                            .send(Message::Text(text_msg))
+                            .await
+                            .map_err(Error::connection)?;
+                    }
+                    Ok(Some(Message::Ping(ping_data))) => {
+                        socket
+                            .send(Message::Pong(ping_data))
+                            .await
+                            .map_err(Error::connection)?;
+                    }
+                    Ok(Some(Message::Pong(_))) | Ok(Some(Message::Frame(_))) => {}
+                    Ok(Some(Message::Close(close_msg))) => {
+                        info!("Client websocket closed. Closing upstream websocket.");
+                        other_socket
+                            .send(Message::Close(close_msg))
+                            .await
+                            .unwrap_or_default();
                         break;
                     }
-                    continue;
-                }
-                Message::Text(msg) => {
-                    if let Err(e) = other_socket.send(Message::Text(msg)).await {
-                        err = Some(Error::other(format!("{e:?}")));
+                    Ok(None) => {
+                        info!("Client websocket stream ended. Closing upstream websocket.");
+                        other_socket
+                            .send(Message::Close(None))
+                            .await
+                            .unwrap_or_default();
                         break;
                     }
-                    continue;
+                    Err(e) => {
+                        info!("IO error on client websocket. Closing upstream websocket.");
+                        other_socket
+                            .send(Message::Close(None))
+                            .await
+                            .unwrap_or_default();
+                        return Err(Error::io(e));
+                    }
                 }
-                Message::Ping(ping_data) => {
-                    socket
-                        .send(Message::Pong(ping_data))
-                        .await
-                        .map_err(Error::connection)?;
-                }
-                Message::Pong(_) | Message::Frame(_) => {
-                    continue;
-                }
-                Message::Close(close_msg) => {
-                    info!("End of MPC Proxy Web Stream. Closing Client Socket.");
-                    other_socket
-                        .send(Message::Close(close_msg))
-                        .await
-                        .unwrap_or_default();
-                    break;
-                }
-            },
-            Ok(None) => {
-                if !shutdown_signal.load(Ordering::SeqCst) {
-                    break;
-                }
-                tokio::time::sleep(std::time::Duration::from_millis(1)).await;
             }
-            Err(e) => {
-                info!("IO Error with MPC Proxy Web Stream. Closing Client Socket.");
-                err = Some(Error::io(e));
-                break;
+            source_msg = other_socket.next_message() => {
+                match source_msg {
+                    Ok(Some(Message::Binary(bin_msg))) => {
+                        socket
+                            .send(Message::Binary(bin_msg))
+                            .await
+                            .map_err(Error::connection)?;
+                    }
+                    Ok(Some(Message::Text(text_msg))) => {
+                        socket
+                            .send(Message::Text(text_msg))
+                            .await
+                            .map_err(Error::connection)?;
+                    }
+                    Ok(Some(Message::Ping(ping_data))) => {
+                        other_socket
+                            .send(Message::Pong(ping_data))
+                            .await
+                            .map_err(Error::connection)?;
+                    }
+                    Ok(Some(Message::Pong(_))) | Ok(Some(Message::Frame(_))) => {}
+                    Ok(Some(Message::Close(close_msg))) => {
+                        info!("Upstream websocket closed. Closing client websocket.");
+                        socket
+                            .send(Message::Close(close_msg))
+                            .await
+                            .unwrap_or_default();
+                        break;
+                    }
+                    Ok(None) => {
+                        info!("Upstream websocket stream ended. Closing client websocket.");
+                        socket
+                            .send(Message::Close(None))
+                            .await
+                            .unwrap_or_default();
+                        break;
+                    }
+                    Err(e) => {
+                        info!("IO error on upstream websocket. Closing client websocket.");
+                        socket
+                            .send(Message::Close(None))
+                            .await
+                            .unwrap_or_default();
+                        return Err(Error::io(e));
+                    }
+                }
             }
         }
-        match other_socket.next_message().await {
-            Ok(Some(msg)) => match msg {
-                Message::Binary(bin_msg) => {
-                    if let Err(e) = socket.send(Message::Binary(bin_msg)).await {
-                        err = Some(Error::other(format!("{e:?}")));
-                        break;
-                    }
-                    continue;
-                }
-                Message::Text(msg) => {
-                    if let Err(e) = socket.send(Message::Text(msg)).await {
-                        err = Some(Error::other(format!("{e:?}")));
-                        break;
-                    }
-                    continue;
-                }
-                Message::Ping(ping_data) => {
-                    other_socket
-                        .send(Message::Pong(ping_data))
-                        .await
-                        .map_err(Error::connection)?;
-                }
-                Message::Pong(_) | Message::Frame(_) => {
-                    continue;
-                }
-                Message::Close(close_msg) => {
-                    info!("End of MPC Proxy Web Stream. Closing Server Socket.");
-                    other_socket
-                        .send(Message::Close(close_msg))
-                        .await
-                        .unwrap_or_default();
-                    break;
-                }
-            },
-            Ok(None) => {
-                if !shutdown_signal.load(Ordering::SeqCst) {
-                    break;
-                }
-                tokio::time::sleep(std::time::Duration::from_millis(1)).await;
-            }
-            Err(e) => {
-                info!("IO Error with MPC Proxy Web Stream. Closing Server Socket.");
-                err = Some(Error::io(e));
-                break;
-            }
+        if !shutdown_signal.load(Ordering::SeqCst) {
+            break;
         }
-    }
-    if let Some(e) = &err {
-        return Err(Error::other(format!("Websocket connection closed: {e:?}")));
     }
     debug!("Shutting down MPC");
     shutdown_signal.store(false, Ordering::SeqCst);
