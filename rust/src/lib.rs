@@ -397,12 +397,7 @@ async fn proxy_websockets(
                         break;
                     }
                     Ok(None) => {
-                        info!("Client websocket stream ended. Closing upstream websocket.");
-                        other_socket
-                            .send(Message::Close(None))
-                            .await
-                            .unwrap_or_default();
-                        break;
+                        tokio::time::sleep(std::time::Duration::from_millis(1)).await;
                     }
                     Err(e) => {
                         info!("IO error on client websocket. Closing upstream websocket.");
@@ -444,12 +439,7 @@ async fn proxy_websockets(
                         break;
                     }
                     Ok(None) => {
-                        info!("Upstream websocket stream ended. Closing client websocket.");
-                        socket
-                            .send(Message::Close(None))
-                            .await
-                            .unwrap_or_default();
-                        break;
+                        tokio::time::sleep(std::time::Duration::from_millis(1)).await;
                     }
                     Err(e) => {
                         info!("IO error on upstream websocket. Closing client websocket.");
