@@ -95,5 +95,14 @@ public final class SignatureModels {
 
         @JsonProperty("presentation")
         public List<Integer> presentation = new ArrayList<>();
+
+        @JsonProperty("petname")
+        public String petname;
+
+        @JsonProperty("lifehash")
+        public List<Integer> lifehash = new ArrayList<>();
+
+        @JsonProperty("reserve_names")
+        public List<String> reserveNames = new ArrayList<>();
     }
 }

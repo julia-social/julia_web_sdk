@@ -67,6 +67,9 @@ pub struct VerifySignatureResponse {
     pub claims: Vec<Claim>,
     pub timestamp: i64,
     pub presentation: Vec<u8>,
+    pub petname: String,
+    pub lifehash: Vec<u8>,
+    pub reserve_names: Vec<String>,
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone)]

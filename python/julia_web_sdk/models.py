@@ -52,6 +52,9 @@ class VerifySignatureResponse(BaseModel):
     claims: list[Claim] = Field(default_factory=list)
     timestamp: int
     presentation: list[int]
+    petname: str
+    lifehash: list[int]
+    reserve_names: list[str]
 
 
 class SignatureRequest(BaseModel):

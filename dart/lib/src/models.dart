@@ -116,6 +116,9 @@ class VerifySignatureResponse {
     required this.claims,
     required this.timestamp,
     required this.presentation,
+    required this.petname,
+    required this.lifehash,
+    required this.reserveNames,
   });
 
   final DidInfo aliasDid;
@@ -123,6 +126,9 @@ class VerifySignatureResponse {
   final List<Claim> claims;
   final int timestamp;
   final List<int> presentation;
+  final String petname;
+  final List<int> lifehash;
+  final List<String> reserveNames;
 
   factory VerifySignatureResponse.fromJson(Map<String, dynamic> json) =>
       VerifySignatureResponse(
@@ -133,6 +139,9 @@ class VerifySignatureResponse {
             .toList(),
         timestamp: json['timestamp'] as int,
         presentation: (json['presentation'] as List<dynamic>).cast<int>(),
+        petname: json['petname'] as String,
+        lifehash: (json['lifehash'] as List<dynamic>).cast<int>(),
+        reserveNames: (json['reserve_names'] as List<dynamic>).cast<String>(),
       );
 
   Map<String, dynamic> toJson() => {
@@ -141,5 +150,8 @@ class VerifySignatureResponse {
     'claims': claims.map((claim) => claim.toJson()).toList(),
     'timestamp': timestamp,
     'presentation': presentation,
+    'petname': petname,
+    'lifehash': lifehash,
+    'reserve_names': reserveNames,
   };
 }
