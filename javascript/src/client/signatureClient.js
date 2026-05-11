@@ -115,7 +115,7 @@ export class SignatureClient {
     const parsed = this.#parseBaseUrl();
     const defaultPort = parsed.protocol === "https:" ? 443 : 80;
     const port = parsed.port ? Number(parsed.port) : defaultPort;
-    return `notbot://s1/${requestId}/${parsed.hostname}/${port}`;
+    return `https://not.bot/s1/${requestId}/${parsed.hostname}/${port}`;
   }
 
   #parseBaseUrl() {
