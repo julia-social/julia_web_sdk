@@ -144,6 +144,12 @@ export function createExpressSignatureAdapter({
         if (targetPath === "/calculate_site_pass" && request.headers["x-site-pass"]) {
           upstreamHeaders["x-site-pass"] = request.headers["x-site-pass"];
         }
+        const cookieHeader = signatureClient.cookieJar?.header(
+          new URL(`${signatureClient.baseUrl}${upstreamPath}`)
+        );
+        if (cookieHeader) {
+          upstreamHeaders.cookie = cookieHeader;
+        }
 
         const upstreamSocket = new WebSocket(toWsUrl(signatureClient.baseUrl, upstreamPath), {
           headers: upstreamHeaders
