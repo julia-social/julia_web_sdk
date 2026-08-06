@@ -4,7 +4,7 @@ version = "1.0.0"
 edition = "2024"
 
 [dependencies]
-dg_xch_core = { git = "https://github.com/GalactechsLLC/dg_xch_utils.git", branch = "wallet_updates" }
+dg_xch_core = { git = "https://github.com/GalactechsLLC/dg_xch_utils.git", branch = "main", features = ["postgres"] }
 portfu = { git = "https://github.com/GalactechsLLC/portfu.git", branch = "2.0.0" }
 reqwest = { version = "0.12.23", features = ["cookies"] }
 serde = { version = "1.0.217", features = ["derive"] }

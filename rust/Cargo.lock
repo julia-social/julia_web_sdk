@@ -451,7 +451,7 @@ dependencies = [
 [[package]]
 name = "dg_parser_macro"
 version = "3.0.0"
-source = "git+https://github.com/GalactechsLLC/dg_xch_utils.git?branch=wallet_updates#88f728f8b5c4fad4d263347903e83a8830434133"
+source = "git+https://github.com/GalactechsLLC/dg_xch_utils.git?branch=main#a188d995965bb23f03851b52e71a9c6a4b99a1cc"
 dependencies = [
  "bytes",
  "dg_xch_serialize",
@@ -465,7 +465,7 @@ dependencies = [
 [[package]]
 name = "dg_xch_core"
 version = "3.0.0"
-source = "git+https://github.com/GalactechsLLC/dg_xch_utils.git?branch=wallet_updates#88f728f8b5c4fad4d263347903e83a8830434133"
+source = "git+https://github.com/GalactechsLLC/dg_xch_utils.git?branch=main#a188d995965bb23f03851b52e71a9c6a4b99a1cc"
 dependencies = [
  "async-trait",
  "bls12_381",
@@ -508,7 +508,7 @@ dependencies = [
 [[package]]
 name = "dg_xch_macros"
 version = "3.0.0"
-source = "git+https://github.com/GalactechsLLC/dg_xch_utils.git?branch=wallet_updates#88f728f8b5c4fad4d263347903e83a8830434133"
+source = "git+https://github.com/GalactechsLLC/dg_xch_utils.git?branch=main#a188d995965bb23f03851b52e71a9c6a4b99a1cc"
 dependencies = [
  "proc-macro-crate",
  "proc-macro2",
@@ -519,7 +519,7 @@ dependencies = [
 [[package]]
 name = "dg_xch_serialize"
 version = "3.0.0"
-source = "git+https://github.com/GalactechsLLC/dg_xch_utils.git?branch=wallet_updates#88f728f8b5c4fad4d263347903e83a8830434133"
+source = "git+https://github.com/GalactechsLLC/dg_xch_utils.git?branch=main#a188d995965bb23f03851b52e71a9c6a4b99a1cc"
 dependencies = [
  "log",
  "serde",
