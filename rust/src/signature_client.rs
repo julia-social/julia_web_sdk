@@ -62,7 +62,7 @@ impl SignatureClient {
     ) -> Result<StartSignatureResponse, Error> {
         let builder = self
             .client
-            .post(format!("{}/signature/start", &self.url))
+            .post(format!("{}/signature/start", self.url))
             .header("api-key", &self.api_key.clone());
         let response = builder.json(&request).send().await.map_err(|e| {
             Error::connection(format!("Error Connecting to Signature Server: {e:?}"))
@@ -76,7 +76,7 @@ impl SignatureClient {
     ) -> Result<GeneratePresentationResponse, Error> {
         let builder = self
             .client
-            .post(format!("{}/signature/presentation", &self.url))
+            .post(format!("{}/signature/presentation", self.url))
             .header("api-key", &self.api_key.clone());
         let response = builder.json(&request).send().await.map_err(|e| {
             Error::connection(format!("Error Connecting to Signature Server: {e:?}"))
@@ -90,7 +90,7 @@ impl SignatureClient {
     ) -> Result<VerifySignatureResponse, Error> {
         let builder = self
             .client
-            .post(format!("{}/signature/verify", &self.url))
+            .post(format!("{}/signature/verify", self.url))
             .header("api-key", &self.api_key.clone());
         let response = builder.json(&request).send().await.map_err(|e| {
             Error::connection(format!("Error Connecting to Signature Server: {e:?}"))
@@ -102,7 +102,7 @@ impl SignatureClient {
     pub async fn get_signature_request_id(&self) -> Result<String, Error> {
         let response = self
             .client
-            .get(format!("{}/signature/notbot", &self.url))
+            .get(format!("{}/signature/notbot", self.url))
             .header("accept", "application/json")
             .send()
             .await
@@ -115,7 +115,7 @@ impl SignatureClient {
     pub async fn get_signature_status(&self) -> Result<bool, Error> {
         let response = self
             .client
-            .get(format!("{}/signature/status", &self.url))
+            .get(format!("{}/signature/status", self.url))
             .header("accept", "application/json")
             .send()
             .await
@@ -132,7 +132,7 @@ impl SignatureClient {
     ) -> Result<ServerPresentation, Error> {
         let response = self
             .client
-            .post(format!("{}/signature/notbot/{}", &self.url, request_id))
+            .post(format!("{}/signature/notbot/{}", self.url, request_id))
             .json(&SignatureNonceRequest { nonce })
             .send()
             .await
@@ -149,7 +149,7 @@ impl SignatureClient {
     ) -> Result<(), Error> {
         let response = self
             .client
-            .post(format!("{}/signature/verify/{}", &self.url, request_id))
+            .post(format!("{}/signature/verify/{}", self.url, request_id))
             .json(&ClientPresentation { presentation })
             .send()
             .await

@@ -12,16 +12,12 @@ use crate::models::{
 use crate::signature_client::{SignatureClient, create_signature_client};
 use dg_xch_core::blockchain::sized_bytes::Bytes32;
 use dg_xch_core::traits::SizedBytes;
-use portfu::macros::*;
-use portfu::pfcore::Json;
-use portfu::pfcore::services::RequestHeaders;
 use portfu::prelude::log::{debug, info};
 use portfu::prelude::tokio_tungstenite::connect_async;
 use portfu::prelude::tokio_tungstenite::tungstenite::Message;
 use portfu::prelude::tokio_tungstenite::tungstenite::client::IntoClientRequest;
-use portfu::prelude::uuid::Uuid;
+use portfu::prelude::wrappers::sessions::SessionManager;
 use portfu::prelude::*;
-use portfu::wrappers::sessions::{Session, SessionManager};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::pin::Pin;
@@ -64,6 +60,11 @@ pub struct ServiceBuilder {
     pub on_success: SuccessCallback,
     pub on_failure: FailureCallback,
     pub expire_time: i64,
+}
+impl Default for ServiceBuilder {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 impl ServiceBuilder {
     pub fn new() -> Self {
@@ -118,16 +119,39 @@ impl From<ServiceBuilder> for ServiceGroup {
             })
             .shared_state(client)
             .shared_state(RwLock::new(SessionSignatures::new()))
-            .service(get_signature_url)
-            .service(get_signature_status)
-            .service(get_request_presentation)
-            .service(verify_presentation)
-            .service(verify_honestbot::default())
-            .service(calculate_site_pass::default())
+            .service(get_service(
+                "/signature/notbot",
+                "signature_notbot",
+                GetSignatureUrl,
+            ))
+            .service(get_service(
+                "/signature/status",
+                "signature_status",
+                GetSignatureStatus,
+            ))
+            .service(post_service(
+                "/signature/notbot/{squid}",
+                "signature_presentation",
+                GetRequestPresentation,
+            ))
+            .service(post_service(
+                "/signature/verify/{request_id}",
+                "signature_verify",
+                VerifyPresentation,
+            ))
+            .service(websocket_service(
+                "/signature/honestbot",
+                "signature_honestbot",
+                VerifyHonestbot,
+            ))
+            .service(websocket_service(
+                "/calculate_site_pass",
+                "calculate_site_pass",
+                CalculateSitePass,
+            ))
     }
 }
 
-#[get("/signature/notbot", output = "json", eoutput = "bytes")]
 async fn get_signature_url(
     signature_client: State<SignatureClient>,
     session: State<RwLock<Session>>,
@@ -173,7 +197,6 @@ struct SignaturePresentationRequest {
     pub nonce: Bytes32,
 }
 
-#[get("/signature/status", output = "json", eoutput = "bytes")]
 async fn get_signature_status(session: State<RwLock<Session>>) -> Result<bool, Error> {
     Ok(session
         .0
@@ -184,13 +207,14 @@ async fn get_signature_status(session: State<RwLock<Session>>) -> Result<bool, E
         .is_some())
 }
 
-#[post("/signature/notbot/{squid}", output = "json", eoutput = "bytes")]
 async fn get_request_presentation(
     payload: Json<Option<SignaturePresentationRequest>>,
     squid: Path,
     signature_client: State<SignatureClient>,
 ) -> Result<ServerPresentation, Error> {
-    let payload = payload.inner().ok_or(Error::input("Missing payload"))?;
+    let payload = payload
+        .into_inner()
+        .ok_or(Error::input("Missing payload"))?;
     let response = signature_client
         .generate_presentation(GeneratePresentationRequest {
             request_id: squid.inner(),
@@ -201,7 +225,6 @@ async fn get_request_presentation(
         compressed_presentation: response.compressed_presentation,
     })
 }
-#[post("/signature/verify/{request_id}", output = "json", eoutput = "bytes")]
 async fn verify_presentation(
     payload: Json<Option<ClientPresentation>>,
     request_id: Path,
@@ -210,7 +233,9 @@ async fn verify_presentation(
     session_signatures: State<RwLock<SessionSignatures>>,
     config: State<SignatureConfig>,
 ) -> Result<(), Error> {
-    let payload = payload.inner().ok_or(Error::input("Missing payload"))?;
+    let payload = payload
+        .into_inner()
+        .ok_or(Error::input("Missing payload"))?;
     let request_id = request_id.inner();
     let response = match signature_client
         .verify_presentation(VerifySignatureRequest {
@@ -250,7 +275,6 @@ async fn verify_presentation(
     Ok(())
 }
 
-#[websocket("/signature/honestbot")]
 async fn verify_honestbot(
     client_socket: WebSocket,
     headers: RequestHeaders,
@@ -273,10 +297,7 @@ async fn verify_honestbot(
         Err(e) => return Err(Error::connection(e)),
     };
     info!("Connected to MPC with HTTP status: {}", response.status());
-    let upstream_socket = WebSocket::new(
-        WebsocketConnection::new(WebsocketMsgStream::Tls(Box::new(ws_stream))),
-        Arc::new(Uuid::new_v4()),
-    );
+    let upstream_socket = ClientWebSocket::new(ws_stream);
     let client_socket = Arc::new(client_socket);
     let upstream_socket = Arc::new(upstream_socket);
     let run = Arc::new(AtomicBool::new(true));
@@ -309,7 +330,6 @@ async fn verify_honestbot(
     }
 }
 
-#[websocket("/calculate_site_pass")]
 async fn calculate_site_pass(
     client_socket: WebSocket,
     signature_client: State<SignatureClient>,
@@ -324,10 +344,7 @@ async fn calculate_site_pass(
         Err(e) => return Err(Error::connection(e)),
     };
     info!("Connected to MPC with HTTP status: {}", response.status());
-    let upstream_socket = WebSocket::new(
-        WebsocketConnection::new(WebsocketMsgStream::Tls(Box::new(ws_stream))),
-        Arc::new(Uuid::new_v4()),
-    );
+    let upstream_socket = ClientWebSocket::new(ws_stream);
     let client_socket = Arc::new(client_socket);
     let upstream_socket = Arc::new(upstream_socket);
     let run = Arc::new(AtomicBool::new(true));
@@ -360,9 +377,299 @@ async fn calculate_site_pass(
     }
 }
 
+fn get_service<H>(path: &str, name: &str, handler: H) -> Service
+where
+    H: ServiceTrait + Send + Sync + 'static,
+{
+    portfu::prelude::ServiceBuilder::new(path)
+        .name(name)
+        .filter(filters::method::GET.clone())
+        .handler(Arc::new(handler))
+        .build()
+}
+
+fn post_service<H>(path: &str, name: &str, handler: H) -> Service
+where
+    H: ServiceTrait + Send + Sync + 'static,
+{
+    portfu::prelude::ServiceBuilder::new(path)
+        .name(name)
+        .filter(filters::method::POST.clone())
+        .handler(Arc::new(handler))
+        .build()
+}
+
+fn websocket_service<H>(path: &str, name: &str, handler: H) -> Service
+where
+    H: ServiceTrait + Send + Sync + 'static,
+{
+    portfu::prelude::ServiceBuilder::new(path)
+        .name(name)
+        .filter(Arc::new(filters::any(
+            String::new(),
+            &[
+                filters::method::GET.clone(),
+                filters::method::OPTIONS.clone(),
+            ],
+        )))
+        .handler(Arc::new(handler))
+        .build()
+}
+
+macro_rules! extract_or_error {
+    ($request:expr, $ty:ty) => {
+        match <$ty as FromRequest<Request>>::try_from($request).await {
+            Ok(value) => value,
+            Err(error) => return Ok(Response::internal_error(format!("{error:?}"))),
+        }
+    };
+}
+
+struct GetSignatureUrl;
+
+impl ServiceTrait for GetSignatureUrl {
+    fn name(&self) -> &str {
+        "signature_notbot"
+    }
+
+    fn serve<'a>(
+        &'a self,
+        request: &'a mut Request,
+    ) -> Pin<Box<dyn Future<Output = Result<Response, PortfuError>> + Send + 'a>> {
+        Box::pin(async move {
+            let signature_client = extract_or_error!(request, State<SignatureClient>);
+            let session = extract_or_error!(request, State<RwLock<Session>>);
+            let config = extract_or_error!(request, State<SignatureConfig>);
+            let session_signatures = extract_or_error!(request, State<RwLock<SessionSignatures>>);
+            match get_signature_url(signature_client, session, config, session_signatures).await {
+                Ok(response) => Ok(Response::json(response)),
+                Err(error) => Ok(Response::internal_error(format!("{error:?}"))),
+            }
+        })
+    }
+}
+
+struct GetSignatureStatus;
+
+impl ServiceTrait for GetSignatureStatus {
+    fn name(&self) -> &str {
+        "signature_status"
+    }
+
+    fn serve<'a>(
+        &'a self,
+        request: &'a mut Request,
+    ) -> Pin<Box<dyn Future<Output = Result<Response, PortfuError>> + Send + 'a>> {
+        Box::pin(async move {
+            let session = extract_or_error!(request, State<RwLock<Session>>);
+            match get_signature_status(session).await {
+                Ok(response) => Ok(Response::json(response)),
+                Err(error) => Ok(Response::internal_error(format!("{error:?}"))),
+            }
+        })
+    }
+}
+
+struct Squid;
+impl PathName for Squid {
+    const NAME: &'static str = "squid";
+}
+
+struct GetRequestPresentation;
+
+impl ServiceTrait for GetRequestPresentation {
+    fn name(&self) -> &str {
+        "signature_presentation"
+    }
+
+    fn serve<'a>(
+        &'a self,
+        request: &'a mut Request,
+    ) -> Pin<Box<dyn Future<Output = Result<Response, PortfuError>> + Send + 'a>> {
+        Box::pin(async move {
+            let payload = extract_or_error!(request, Json<Option<SignaturePresentationRequest>>);
+            let squid: Path = extract_or_error!(request, PathImpl<Squid>).into();
+            let signature_client = extract_or_error!(request, State<SignatureClient>);
+            match get_request_presentation(payload, squid, signature_client).await {
+                Ok(response) => Ok(Response::json(response)),
+                Err(error) => Ok(Response::internal_error(format!("{error:?}"))),
+            }
+        })
+    }
+}
+
+struct RequestId;
+impl PathName for RequestId {
+    const NAME: &'static str = "request_id";
+}
+
+struct VerifyPresentation;
+
+impl ServiceTrait for VerifyPresentation {
+    fn name(&self) -> &str {
+        "signature_verify"
+    }
+
+    fn serve<'a>(
+        &'a self,
+        request: &'a mut Request,
+    ) -> Pin<Box<dyn Future<Output = Result<Response, PortfuError>> + Send + 'a>> {
+        Box::pin(async move {
+            let payload = extract_or_error!(request, Json<Option<ClientPresentation>>);
+            let request_id: Path = extract_or_error!(request, PathImpl<RequestId>).into();
+            let signature_client = extract_or_error!(request, State<SignatureClient>);
+            let session = extract_or_error!(request, State<RwLock<Session>>);
+            let session_signatures = extract_or_error!(request, State<RwLock<SessionSignatures>>);
+            let config = extract_or_error!(request, State<SignatureConfig>);
+            match verify_presentation(
+                payload,
+                request_id,
+                signature_client,
+                session,
+                session_signatures,
+                config,
+            )
+            .await
+            {
+                Ok(()) => Ok(Response::ok("")),
+                Err(error) => Ok(Response::internal_error(format!("{error:?}"))),
+            }
+        })
+    }
+}
+
+struct VerifyHonestbot;
+
+impl ServiceTrait for VerifyHonestbot {
+    fn name(&self) -> &str {
+        "signature_honestbot"
+    }
+
+    fn serve<'a>(
+        &'a self,
+        request: &'a mut Request,
+    ) -> Pin<Box<dyn Future<Output = Result<Response, PortfuError>> + Send + 'a>> {
+        Box::pin(async move {
+            if request.method() == http::Method::OPTIONS {
+                return Ok(Response::ok(""));
+            }
+            let headers = request.headers().clone();
+            let signature_client = extract_or_error!(request, State<SignatureClient>);
+            start_websocket(request, move |socket| async move {
+                verify_honestbot(socket, headers, signature_client).await
+            })
+        })
+    }
+}
+
+struct CalculateSitePass;
+
+impl ServiceTrait for CalculateSitePass {
+    fn name(&self) -> &str {
+        "calculate_site_pass"
+    }
+
+    fn serve<'a>(
+        &'a self,
+        request: &'a mut Request,
+    ) -> Pin<Box<dyn Future<Output = Result<Response, PortfuError>> + Send + 'a>> {
+        Box::pin(async move {
+            if request.method() == http::Method::OPTIONS {
+                return Ok(Response::ok(""));
+            }
+            let signature_client = extract_or_error!(request, State<SignatureClient>);
+            start_websocket(request, move |socket| async move {
+                calculate_site_pass(socket, signature_client).await
+            })
+        })
+    }
+}
+
+fn start_websocket<F, Fut>(request: &mut Request, handler: F) -> Result<Response, PortfuError>
+where
+    F: FnOnce(WebSocket) -> Fut + Send + 'static,
+    Fut: Future<Output = Result<(), Error>> + Send + 'static,
+{
+    use portfu::prelude::tokio_tungstenite::tungstenite::handshake::derive_accept_key;
+    use portfu::prelude::tokio_tungstenite::tungstenite::protocol::Role;
+
+    let is_upgrade = matches!(
+        request
+            .headers()
+            .get(http::header::UPGRADE)
+            .and_then(|value| value.to_str().ok()),
+        Some(value) if value.eq_ignore_ascii_case("websocket")
+    );
+    if !is_upgrade {
+        return Ok(Response::from_status_and_message(
+            http::StatusCode::BAD_REQUEST,
+            "Expected websocket upgrade request",
+        ));
+    }
+
+    let Some(key) = request.headers().get("Sec-WebSocket-Key").cloned() else {
+        return Ok(Response::from_status_and_message(
+            http::StatusCode::BAD_REQUEST,
+            "Missing Sec-WebSocket-Key header",
+        ));
+    };
+    let version_ok = request
+        .headers()
+        .get("Sec-WebSocket-Version")
+        .and_then(|value| value.to_str().ok())
+        .is_some_and(|value| value == "13");
+    if !version_ok {
+        return Ok(Response::from_status_and_message(
+            http::StatusCode::BAD_REQUEST,
+            "Unsupported websocket version",
+        ));
+    }
+
+    let upgrade = match request.request_type() {
+        RequestType::Stream(request) => hyper::upgrade::on(request),
+        RequestType::Sized(request) => hyper::upgrade::on(request),
+        _ => {
+            return Ok(Response::from_status_and_message(
+                http::StatusCode::BAD_REQUEST,
+                "WebSocket upgrade requires a live HTTP request",
+            ));
+        }
+    };
+    let accept = derive_accept_key(key.as_bytes());
+    let response = http::Response::builder()
+        .status(http::StatusCode::SWITCHING_PROTOCOLS)
+        .header(http::header::CONNECTION, "upgrade")
+        .header(http::header::UPGRADE, "websocket")
+        .header("Sec-WebSocket-Accept", accept)
+        .body(())
+        .map_err(|error| {
+            PortfuError::Internal(format!("Failed to build websocket response: {error:?}"))
+        })?;
+
+    tokio::spawn(async move {
+        match upgrade.await {
+            Ok(upgraded) => {
+                let websocket =
+                    portfu::prelude::tokio_tungstenite::WebSocketStream::from_raw_socket(
+                        hyper_util::rt::TokioIo::new(upgraded),
+                        Role::Server,
+                        None,
+                    )
+                    .await;
+                if let Err(error) = handler(WebSocket::new(websocket)).await {
+                    debug!("Websocket handler exited with error: {error}");
+                }
+            }
+            Err(error) => debug!("Websocket upgrade failed: {error:?}"),
+        }
+    });
+
+    Ok(response.into())
+}
+
 async fn proxy_websockets(
     socket: Arc<WebSocket>,
-    other_socket: Arc<WebSocket>,
+    other_socket: Arc<ClientWebSocket>,
     shutdown_signal: Arc<AtomicBool>,
 ) -> Result<(), Error> {
     loop {
