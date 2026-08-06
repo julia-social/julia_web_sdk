@@ -5,15 +5,18 @@ use crate::models::{
     VerifySignatureResponse,
 };
 use dg_xch_core::blockchain::sized_bytes::Bytes32;
-use reqwest::Client;
+use reqwest::cookie::{CookieStore, Jar};
+use reqwest::{Client, Url};
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 use std::env;
+use std::sync::Arc;
 use std::time::Duration;
 
 #[derive(Clone)]
 pub struct SignatureClient {
     client: Client,
+    cookies: Arc<Jar>,
     url: String,
     api_key: String,
 }
@@ -25,7 +28,8 @@ struct SignatureNonceRequest {
 
 impl SignatureClient {
     pub fn new(host: &str, port: u16, api_key: &str, secure: bool) -> SignatureClient {
-        let client = build_http_client();
+        let cookies = Arc::new(Jar::default());
+        let client = build_http_client(cookies.clone());
         let url = if secure {
             format!("https://{host}:{port}")
         } else {
@@ -33,6 +37,7 @@ impl SignatureClient {
         };
         Self {
             client,
+            cookies,
             url,
             api_key: api_key.to_string(),
         }
@@ -46,8 +51,10 @@ impl SignatureClient {
     }
 
     pub fn with_url_and_api_key(url: &str, api_key: &str) -> SignatureClient {
+        let cookies = Arc::new(Jar::default());
         Self {
-            client: build_http_client(),
+            client: build_http_client(cookies.clone()),
+            cookies,
             url: url.trim_end_matches('/').to_string(),
             api_key: api_key.to_string(),
         }
@@ -55,6 +62,16 @@ impl SignatureClient {
 
     pub fn url(&self) -> String {
         self.url.clone()
+    }
+
+    /// Returns cookies issued by the signature server for use in its WSS upgrade.
+    ///
+    /// Reqwest owns HTTP cookie handling, but tokio-tungstenite does not share
+    /// Reqwest's cookie jar, so callers must add this header explicitly.
+    pub fn cookie_header(&self) -> Result<Option<reqwest::header::HeaderValue>, Error> {
+        let url = Url::parse(&self.url)
+            .map_err(|error| Error::connection(format!("Invalid signature server URL: {error}")))?;
+        Ok(self.cookies.cookies(&url))
     }
     pub async fn start_signature(
         &self,
@@ -178,9 +195,9 @@ impl SignatureClient {
     }
 }
 
-fn build_http_client() -> Client {
+fn build_http_client(cookies: Arc<Jar>) -> Client {
     Client::builder()
-        .cookie_store(true)
+        .cookie_provider(cookies)
         .timeout(Duration::from_secs(180))
         .connect_timeout(Duration::from_secs(180))
         .read_timeout(Duration::from_secs(180))
@@ -233,5 +250,24 @@ pub(crate) async fn parse_response<T: DeserializeOwned>(
                 String::from_utf8_lossy(&body)
             ),
         })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn cookie_header_includes_secure_signer_cookie() {
+        let client = SignatureClient::with_url_and_api_key("https://signer.example.com", "key");
+        let signer_url = Url::parse(&client.url).unwrap();
+        client
+            .cookies
+            .add_cookie_str("route=signer-1; Secure; Path=/", &signer_url);
+
+        assert_eq!(
+            client.cookie_header().unwrap().unwrap().to_str().unwrap(),
+            "route=signer-1"
+        );
     }
 }

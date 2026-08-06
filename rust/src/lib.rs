@@ -292,6 +292,10 @@ async fn verify_honestbot(
                 .insert(name.to_owned(), value.to_owned());
         }
     }
+    if let Some(cookie) = signature_client.cookie_header()? {
+        request.headers_mut().insert(http::header::COOKIE, cookie);
+    }
+
     let (ws_stream, response) = match connect_async(request).await {
         Ok(result) => result,
         Err(e) => return Err(Error::connection(e)),
@@ -336,9 +340,13 @@ async fn calculate_site_pass(
 ) -> Result<(), Error> {
     let ws_url = signature_client.url().replace("http", "ws");
     info!("Starting Upstream MPC Connection to: {}", ws_url);
-    let request = (&format!("{}/calculate_site_pass", ws_url))
+    let mut request = (&format!("{}/calculate_site_pass", ws_url))
         .into_client_request()
         .map_err(Error::connection)?;
+    if let Some(cookie) = signature_client.cookie_header()? {
+        request.headers_mut().insert(http::header::COOKIE, cookie);
+    }
+
     let (ws_stream, response) = match connect_async(request).await {
         Ok(result) => result,
         Err(e) => return Err(Error::connection(e)),
