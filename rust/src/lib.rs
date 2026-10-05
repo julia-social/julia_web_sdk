@@ -633,6 +633,9 @@ where
         ));
     }
 
+    let connection_info = request.get::<ConnectionInfo>().cloned().ok_or_else(|| {
+        PortfuError::Internal("WebSocket upgrade requires ConnectionInfo".to_string())
+    })?;
     let upgrade = match request.request_type() {
         RequestType::Stream(request) => hyper::upgrade::on(request),
         RequestType::Sized(request) => hyper::upgrade::on(request),
@@ -664,7 +667,7 @@ where
                         None,
                     )
                     .await;
-                if let Err(error) = handler(WebSocket::new(websocket)).await {
+                if let Err(error) = handler(WebSocket::new(websocket, connection_info)).await {
                     debug!("Websocket handler exited with error: {error}");
                 }
             }
