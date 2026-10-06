@@ -219,6 +219,7 @@ async fn get_request_presentation(
         .generate_presentation(GeneratePresentationRequest {
             request_id: squid.inner(),
             nonce: payload.nonce,
+            presentation_format: None,
         })
         .await?;
     Ok(ServerPresentation {

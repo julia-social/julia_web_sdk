@@ -21,6 +21,9 @@ pub struct StartSignatureResponse {
 pub struct GeneratePresentationRequest {
     pub request_id: String,
     pub nonce: Bytes32,
+    /// Signed presentation envelope; independent of the immutable requested message.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub presentation_format: Option<u8>,
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
@@ -86,4 +89,24 @@ pub struct SignatureRequest {
 pub struct VerifyHonestBotRequest {
     pub julia_challenge: Bytes32,
     pub presentation_hash: Bytes32,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn presentation_format_is_additive_and_only_explicit_when_requested() {
+        let legacy = serde_json::json!({"request_id":"frozen", "nonce":"0x0000000000000000000000000000000000000000000000000000000000000000"});
+        let request: GeneratePresentationRequest = serde_json::from_value(legacy.clone()).unwrap();
+        assert_eq!(request.presentation_format, None);
+        assert_eq!(serde_json::to_value(&request).unwrap(), legacy);
+        let explicit = GeneratePresentationRequest {
+            presentation_format: Some(2),
+            ..request
+        };
+        let wire = serde_json::to_value(&explicit).unwrap();
+        assert_eq!(wire["presentation_format"], 2);
+        assert_eq!(wire["request_id"], legacy["request_id"]);
+        assert_eq!(wire["nonce"], legacy["nonce"]);
+    }
 }
