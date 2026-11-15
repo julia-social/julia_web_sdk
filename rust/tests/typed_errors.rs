@@ -238,6 +238,8 @@ async fn invalid_contracts_are_safe_internal_failures() {
         ("correlation_id", json!(SECRET)),
         ("correlation_id", json!("b8621e5275244cac9991893fbe6bf7a2")),
         ("message", Value::Null),
+        ("message", json!("")),
+        ("message", json!(" \t\r\n")),
     ] {
         let mut wire = valid.clone();
         wire[field] = value;

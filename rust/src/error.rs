@@ -41,6 +41,7 @@ impl SignatureFailure {
 
         let envelope: Envelope = serde_json::from_slice(body).ok()?;
         if envelope.version != 1
+            || envelope._message.trim().is_empty()
             || envelope.code.len() > 64
             || !envelope.code.starts_with(|c: char| c.is_ascii_uppercase())
             || !envelope.code.bytes().all(|c| c.is_ascii_alphanumeric())
