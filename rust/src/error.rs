@@ -1,6 +1,99 @@
 use dg_xch_core::errors::ClvmError;
 use std::fmt::{Display, Formatter};
 
+/// Safe failure returned only by the opt-in `SignatureClient` v1 methods.
+///
+/// `status` preserves the upstream HTTP status when a response was received.
+/// Transport and invalid-contract failures use `ServerError` and no correlation
+/// ID. Only a validated v1 envelope can supply an upstream code and UUID.
+/// Messages are SDK-owned text; upstream messages and transport details are never
+/// included, even in `Debug` or `Display` output.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SignatureFailure {
+    pub version: u8,
+    pub code: String,
+    pub message: String,
+    pub correlation_id: Option<String>,
+    pub status: Option<u16>,
+}
+
+impl SignatureFailure {
+    pub(crate) fn internal(status: Option<u16>) -> Self {
+        Self {
+            version: 1,
+            code: "ServerError".into(),
+            message: "The request could not be completed".into(),
+            correlation_id: None,
+            status,
+        }
+    }
+
+    pub(crate) fn from_envelope(body: &[u8], status: u16) -> Option<Self> {
+        #[derive(serde::Deserialize)]
+        struct Envelope {
+            version: u8,
+            code: String,
+            // Required by the contract, but never trusted as safe output.
+            #[serde(rename = "message")]
+            _message: String,
+            correlation_id: String,
+        }
+
+        let envelope: Envelope = serde_json::from_slice(body).ok()?;
+        if envelope.version != 1
+            || envelope.code.len() > 64
+            || !envelope.code.starts_with(|c: char| c.is_ascii_uppercase())
+            || !envelope.code.bytes().all(|c| c.is_ascii_alphanumeric())
+        {
+            return None;
+        }
+        // Require the canonical hyphenated UUID shape, not arbitrary body text.
+        let correlation = uuid::Uuid::parse_str(&envelope.correlation_id).ok()?;
+        if !correlation
+            .hyphenated()
+            .to_string()
+            .eq_ignore_ascii_case(&envelope.correlation_id)
+        {
+            return None;
+        }
+        let message = match envelope.code.as_str() {
+            "InvalidSession" => "Invalid session",
+            "SessionExpired" => "Session expired",
+            "ExistingIdentity" => "An identity already exists; recovery is required",
+            "PresentationNotFound" => "Presentation not found",
+            "MissingCredential" => "A required credential was not presented",
+            "SitePassRecalculationRequired" => "Site pass must be recalculated",
+            "AlreadyUpgraded" => "Identity already upgraded",
+            "NotNewPerson" => "Identity cannot be upgraded",
+            "UpgradeTooSoon" => "Please wait before retrying the upgrade",
+            "RecoveryDataNotFound" => "Recovery data not found",
+            "RequestNotActive" => "Request is no longer active",
+            "MetadataUnavailable" => "Signature metadata is unavailable",
+            "ProtocolUnsupported" => "Unsupported server protocol",
+            "NonceNotFound" => "Device linking code was not found",
+            "UnsupportedPresentation" => "Unsupported presentation version",
+            // Generic and future wire codes receive no application-specific
+            // meaning. Preserve only the bounded identifier, never raw text.
+            _ => "The request could not be completed",
+        };
+        Some(Self {
+            version: 1,
+            code: envelope.code,
+            message: message.into(),
+            correlation_id: Some(envelope.correlation_id),
+            status: Some(status),
+        })
+    }
+}
+
+impl Display for SignatureFailure {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{} - {}", self.code, self.message)
+    }
+}
+
+impl std::error::Error for SignatureFailure {}
+
 #[derive(Debug)]
 pub struct Error {
     pub message: String,
