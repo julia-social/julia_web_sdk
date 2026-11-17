@@ -29,6 +29,47 @@ Rust crate for Julia verification routes, plus async clients for both upstream a
   - `start_signature(StartSignatureRequest) -> Result<StartSignatureResponse, Error>`
   - `generate_presentation(GeneratePresentationRequest) -> Result<GeneratePresentationResponse, Error>`
   - `verify_presentation(VerifySignatureRequest) -> Result<VerifySignatureResponse, Error>`
+  - `generate_presentation_v1(GeneratePresentationRequest) -> Result<GeneratePresentationResponse, SignatureFailure>`
+  - `verify_presentation_v1(VerifySignatureRequest) -> Result<VerifySignatureResponse, SignatureFailure>`
+
+The additive `_v1` methods require a protocol v1 server and send
+`x-notbot-protocol: 1`. Existing methods and `ServiceBuilder` retain their
+headerless requests and legacy error behavior; upgrading this dependency alone
+does not opt existing applications into the new contract.
+
+`julia_web_sdk::error::SignatureFailure` exposes:
+
+```rust
+pub struct SignatureFailure {
+    pub version: u8,                    // Always 1
+    pub code: String,                   // Validated wire code identifier
+    pub message: String,                // Fixed safe SDK text
+    pub correlation_id: Option<String>, // Validated upstream UUID, if available
+    pub status: Option<u16>,            // Original upstream HTTP status, if received
+}
+```
+
+Only an error response with media type `application/vnd.notbot.error+json`,
+version `1`, a bounded code identifier, a string message, and a canonical hyphenated UUID
+is accepted as a typed upstream failure. Application codes include
+`InvalidSession`, `SessionExpired`, `ExistingIdentity`, `PresentationNotFound`,
+`MissingCredential`, `SitePassRecalculationRequired`, `AlreadyUpgraded`,
+`NotNewPerson`, `UpgradeTooSoon`, `RecoveryDataNotFound`, `RequestNotActive`,
+`MetadataUnavailable`, `ProtocolUnsupported`, `NonceNotFound`, and
+`UnsupportedPresentation`, plus generic Julia and relay codes. Branch on `code`,
+never on `message` or HTTP status alone. Unknown identifiers are preserved with
+generic safe text; callers must map unrecognized codes to a generic failure.
+Identifiers must be ASCII alphanumeric, start with an uppercase letter, and be
+at most 64 bytes. Extra envelope fields such as `legacy_body_bytes` are ignored.
+
+Malformed envelopes, malformed code identifiers or unknown protocol versions,
+invalid success bodies, and transport failures produce `ServerError`, a fixed safe message, and no
+correlation ID. `status` retains a received HTTP status even for an invalid
+contract; transport failures have `None`. A relay should only use a 4xx or 5xx
+status and otherwise fall back to 500. Upstream body text and network diagnostics
+are never included in these failures, including their `Debug` and `Display`
+representations. Metadata failures are identified by `MetadataUnavailable`,
+independently of upstream message text.
 
 ## Backend Integration Pattern
 

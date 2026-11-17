@@ -1,4 +1,4 @@
-use crate::error::{Error, ErrorCode};
+use crate::error::{Error, ErrorCode, SignatureFailure};
 use crate::models::{
     ClientPresentation, GeneratePresentationRequest, GeneratePresentationResponse,
     ServerPresentation, StartSignatureRequest, StartSignatureResponse, VerifySignatureRequest,
@@ -116,6 +116,41 @@ impl SignatureClient {
         Ok(resp)
     }
 
+    /// Generate a presentation with protocol v1 typed, safe failures.
+    /// Requires a server supporting `x-notbot-protocol: 1`.
+    pub async fn generate_presentation_v1(
+        &self,
+        request: GeneratePresentationRequest,
+    ) -> Result<GeneratePresentationResponse, SignatureFailure> {
+        self.post_v1("/signature/presentation", &request).await
+    }
+
+    /// Verify a presentation with protocol v1 typed, safe failures.
+    /// Requires a server supporting `x-notbot-protocol: 1`.
+    pub async fn verify_presentation_v1(
+        &self,
+        request: VerifySignatureRequest,
+    ) -> Result<VerifySignatureResponse, SignatureFailure> {
+        self.post_v1("/signature/verify", &request).await
+    }
+
+    async fn post_v1<T: DeserializeOwned>(
+        &self,
+        path: &str,
+        request: &impl Serialize,
+    ) -> Result<T, SignatureFailure> {
+        let response = self
+            .client
+            .post(format!("{}{path}", self.url))
+            .header("api-key", &self.api_key)
+            .header("x-notbot-protocol", "1")
+            .json(request)
+            .send()
+            .await
+            .map_err(|_| SignatureFailure::internal(None))?;
+        parse_response_v1(response).await
+    }
+
     pub async fn get_signature_request_id(&self) -> Result<String, Error> {
         let response = self
             .client
@@ -218,6 +253,61 @@ pub fn create_signature_client() -> SignatureClient {
         &api_key,
         server_hostname != "localhost",
     )
+}
+
+async fn parse_response_v1<T: DeserializeOwned>(
+    mut response: reqwest::Response,
+) -> Result<T, SignatureFailure> {
+    let status = response.status();
+    let internal = || SignatureFailure::internal(Some(status.as_u16()));
+    let mut protocol_headers = response.headers().get_all("x-notbot-protocol").iter();
+    let protocol_valid = match (protocol_headers.next(), protocol_headers.next()) {
+        (None, None) => true,
+        (Some(value), None) => value == "1",
+        _ => false,
+    };
+    if !protocol_valid {
+        return Err(internal());
+    }
+    let mut content_types = response
+        .headers()
+        .get_all(reqwest::header::CONTENT_TYPE)
+        .iter();
+    let typed_error = content_types
+        .next()
+        .and_then(|value| value.to_str().ok())
+        .is_some_and(|value| {
+            value
+                .split(';')
+                .next()
+                .unwrap_or_default()
+                .trim()
+                .eq_ignore_ascii_case("application/vnd.notbot.error+json")
+        });
+    if content_types.next().is_some() {
+        return Err(internal());
+    }
+    if status.is_success() {
+        if typed_error {
+            return Err(internal());
+        }
+        let body = response.bytes().await.map_err(|_| internal())?;
+        return serde_json::from_slice(&body).map_err(|_| internal());
+    }
+    if !typed_error || !(status.is_client_error() || status.is_server_error()) {
+        return Err(internal());
+    }
+    // Error envelopes are small. Bound allocation even if an upstream proxy
+    // supplies an unbounded or chunked diagnostic response.
+    const MAX_ERROR_BYTES: usize = 64 * 1024;
+    let mut body = Vec::new();
+    while let Some(chunk) = response.chunk().await.map_err(|_| internal())? {
+        if chunk.len() > MAX_ERROR_BYTES - body.len() {
+            return Err(internal());
+        }
+        body.extend_from_slice(&chunk);
+    }
+    Err(SignatureFailure::from_envelope(&body, status.as_u16()).unwrap_or_else(internal))
 }
 
 pub(crate) async fn parse_response<T: DeserializeOwned>(
